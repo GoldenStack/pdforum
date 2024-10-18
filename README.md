@@ -1,6 +1,6 @@
 # PDForum
 
-PDForum is a PDF-only social media site.
+PDForum is a PDF-only social media website.
 
 That's right. There's no HTML. No CSS. Just pure, static, dynamically-rendered PDFs.
 

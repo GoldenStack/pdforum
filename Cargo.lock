@@ -388,7 +388,7 @@ dependencies = [
 
 [[package]]
 name = "pdforum"
-version = "0.1.0"
+version = "254.50.582183"
 dependencies = [
  "anyhow",
  "axum",

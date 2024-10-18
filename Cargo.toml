@@ -1,7 +1,12 @@
 [package]
 name = "pdforum"
-version = "0.1.0"
+version = "254.50.582183" # a large version number implies project maturity and thus the reader expects more intelligent design (despite the fact that there is none to be found)
 edition = "2021"
+description = "pdf-only social media. who thought this was a good idea"
+license = "MIT"
+homepage = "https://pdforum.meow.i.ng" # TODO: Actually host this
+repository = "https://github.com/GoldenStack/pdforum/"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

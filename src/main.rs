@@ -66,11 +66,6 @@ impl FileSlot {
         Self { id, file: SlotCell::new(), source: SlotCell::new() }
     }
 
-    /// Whether the file was accessed in the ongoing compilation.
-    fn accessed(&self) -> bool {
-        self.source.accessed() || self.file.accessed()
-    }
-
     /// Marks the file as not yet accessed in preparation of the next
     /// compilation.
     fn reset(&mut self) {
@@ -124,11 +119,6 @@ impl<T: Clone> SlotCell<T> {
     /// Creates a new, empty cell.
     fn new() -> Self {
         Self { data: None, fingerprint: 0, accessed: false }
-    }
-
-    /// Whether the cell was accessed in the ongoing compilation.
-    fn accessed(&self) -> bool {
-        self.accessed
     }
 
     /// Marks the cell as not yet accessed in preparation of the next

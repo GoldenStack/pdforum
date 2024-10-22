@@ -119,7 +119,7 @@
     - Organize a talent show and marshmallow roasting competition
 
 "marcie school update":
-  Topic: Marcie's Academic Progress
+  Topic: "{{ PDForum Template }}"
   Time: 10 mins
   Lead: Peppermint Patty
   Purpose: Discuss, Support
@@ -132,7 +132,7 @@
     - Offer encouragement and support to Marcie in her studies
 
 "linus blanket workshop":
-  Topic: Linus and his blanket
+  Topic: "{{ PDForum Template }}"
   Time: 20 mins
   Lead: Lucy
   Purpose: Understand, *Support*

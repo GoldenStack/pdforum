@@ -119,36 +119,6 @@ fn decode_utf8(buf: &[u8]) -> FileResult<&str> {
     Ok(std::str::from_utf8(buf.strip_prefix(b"\xef\xbb\xbf").unwrap_or(buf))?)
 }
 
-fn read_from_disk(path: &Path) -> FileResult<Vec<u8>> {
-    let f = |e| FileError::from_io(e, path);
-    if std::fs::metadata(path).map_err(f)?.is_dir() {
-        Err(FileError::IsDirectory)
-    } else {
-        std::fs::read(path).map_err(f)
-    }
-}
-
-/// Resolves the path of a file id on the system, downloading a package if
-/// necessary.
-fn system_path(
-    project_root: &Path,
-    id: FileId,
-    package_storage: &PackageStorage,
-) -> FileResult<PathBuf> {
-    // Determine the root path relative to which the file path
-    // will be resolved.
-    let buf;
-    let mut root = project_root;
-    if let Some(spec) = id.package() {
-        buf = package_storage.prepare_package(spec, &mut ProgressSink)?;
-        root = &buf;
-    }
-
-    // Join the path to the root. If it tries to escape, deny
-    // access. Note: It can still escape via symlinks.
-    id.vpath().resolve(root).ok_or(FileError::AccessDenied)
-}
-
 /// Lazily processes data for a file.
 #[derive(Debug)]
 struct SlotCell<T> {
@@ -246,20 +216,21 @@ impl FWorld {
             .search();
 
         let read: Read = |id, project_root, package_storage| {
-            println!("{:?}, \t{:?}, \t{:?}", id.vpath(), id.vpath().as_rootless_path(), id.package());
-            if id.vpath().as_rootless_path() == Path::new("yagenda.typ") {
-                return Ok(include_bytes!("../yagenda.typ").to_vec());
-            }
-            if id.vpath().as_rootless_path() == Path::new("example.typ") {
+            let rootless = id.vpath().as_rootless_path();
+
+            if rootless == Path::new("yagenda.typ") {
+                Ok(include_bytes!("../yagenda.typ").to_vec())
+            } else if rootless == Path::new("example.typ") {
                 let s = include_str!("../example.typ");
 
                 let replace = format!("{:?}\n", Instant::now());
                 println!("R {}", replace);
 
-                return Ok(s.replace("{{ PDForum Template }}", replace.as_str()).as_bytes().to_vec());
-            };
-
-            read_from_disk(&system_path(project_root, id, package_storage)?)
+                Ok(s.replace("{{ PDForum Template }}", replace.as_str()).as_bytes().to_vec())
+            } else {
+                println!("NEW FILE: {:?}, \t{:?}, \t{:?}", id.vpath(), id.vpath().as_rootless_path(), id.package());
+                Err(FileError::NotFound(project_root.to_path_buf()))
+            }            
         };
 
         Self {
@@ -277,17 +248,6 @@ impl FWorld {
             now: Utc::now(),
             read,
         }
-    }
-
-    /// Return all paths the last compilation depended on.
-    pub fn dependencies(&mut self) -> impl Iterator<Item = PathBuf> + '_ {
-        self.slots
-            .get_mut()
-            .values()
-            .filter(|slot| slot.accessed())
-            .filter_map(|slot| {
-                system_path(&self.root, slot.id, &self.package_storage).ok()
-            })
     }
 
     /// Reset the compilation state in preparation of a new compilation.

@@ -13,6 +13,13 @@ readme = "README.md"
 [dependencies]
 anyhow = "1.0.89"
 axum = "0.7.7"
-pdf-writer = "0.12.0"
+chrono = "0.4.38"
+comemo = "0.4.0"
+parking_lot = "0.12.3"
 tokio = { version = "1.40.0", features = ["full"] }
+typst = "0.12.0"
+typst-assets = "0.12.0"
+typst-cli = "0.12.0"
+typst-kit = "0.12.0"
+typst-pdf = "0.12.0"
 

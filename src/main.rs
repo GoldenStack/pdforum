@@ -79,14 +79,9 @@ impl FileSlot {
     }
 
     /// Retrieve the source for this file.
-    fn source(
-        &mut self,
-        read: &Read,
-        project_root: &Path,
-        package_storage: &PackageStorage,
-    ) -> FileResult<Source> {
+    fn source(&mut self, read: &Read) -> FileResult<Source> {
         self.source.get_or_init(
-            || read(self.id, project_root, package_storage),
+            || read(self.id),
             |data, prev| {
                 let text = decode_utf8(&data)?;
                 if let Some(mut prev) = prev {
@@ -100,14 +95,9 @@ impl FileSlot {
     }
 
     /// Retrieve the file's bytes.
-    fn file(
-        &mut self,
-        read: &Read,
-        project_root: &Path,
-        package_storage: &PackageStorage,
-    ) -> FileResult<Bytes> {
+    fn file(&mut self, read: &Read) -> FileResult<Bytes> {
         self.file.get_or_init(
-            || read(self.id, project_root, package_storage),
+            || read(self.id),
             |data, _| Ok(data.into()),
         )
     }
@@ -179,10 +169,7 @@ impl<T: Clone> SlotCell<T> {
     }
 }
 
-/// A world that provides access to the operating system.
 pub struct FWorld {
-    /// The root relative to which absolute paths are resolved.
-    root: PathBuf,
     /// The input path.
     main: FileId,
     /// Typst's standard library.
@@ -193,15 +180,13 @@ pub struct FWorld {
     fonts: Vec<FontSlot>,
     /// Maps file ids to source files and buffers.
     slots: Mutex<HashMap<FileId, FileSlot>>,
-    /// Holds information about where packages are stored.
-    package_storage: PackageStorage,
     /// The current datetime if requested.
     now: DateTime<Utc>,
     /// Function for reading files from the filesystem.
-    read: Read,
+    read: fn(FileId) -> FileResult<Vec<u8>>,
 }
 
-pub type Read = fn(FileId, &Path, &PackageStorage) -> FileResult<Vec<u8>>;
+pub type Read = fn(FileId) -> FileResult<Vec<u8>>;
 
 impl FWorld {
     pub fn new(path: PathBuf) -> Self {
@@ -215,7 +200,7 @@ impl FWorld {
             .include_system_fonts(true)
             .search();
 
-        let read: Read = |id, project_root, package_storage| {
+        let read: Read = |id| {
             let rootless = id.vpath().as_rootless_path();
 
             if rootless == Path::new("yagenda.typ") {
@@ -229,22 +214,16 @@ impl FWorld {
                 Ok(s.replace("{{ PDForum Template }}", replace.as_str()).as_bytes().to_vec())
             } else {
                 println!("NEW FILE: {:?}, \t{:?}, \t{:?}", id.vpath(), id.vpath().as_rootless_path(), id.package());
-                Err(FileError::NotFound(project_root.to_path_buf()))
+                Err(FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
             }            
         };
 
         Self {
-            root,
             main,
             library: LazyHash::new(Library::default()),
             book: LazyHash::new(fonts.book),
             fonts: fonts.fonts,
             slots: Mutex::new(HashMap::new()),
-            package_storage: PackageStorage::new(
-                None,
-                None,
-                Downloader::new(concat!("typst/", env!("CARGO_PKG_VERSION"))),
-            ),
             now: Utc::now(),
             read,
         }
@@ -283,11 +262,11 @@ impl World for FWorld {
     }
 
     fn source(&self, id: FileId) -> FileResult<Source> {
-        self.slot(id, |slot| slot.source(&self.read, &self.root, &self.package_storage))
+        self.slot(id, |slot| slot.source(&self.read))
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        self.slot(id, |slot| slot.file(&self.read, &self.root, &self.package_storage))
+        self.slot(id, |slot| slot.file(&self.read))
     }
 
     fn font(&self, index: usize) -> Option<Font> {

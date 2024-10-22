@@ -1,6 +1,6 @@
 #import "yagenda.typ": *
 #show: agenda.with(
-  name: "Pumpkins and peanuts committee {{ PDForum Template }}",
+  name: "Pumpkins and peanuts committee",
   date: "03/01/2000", 
   time: "2 pm",
   location: "baseball field", 
@@ -145,7 +145,7 @@
     - Release a blanket statement
 
 "snoopy plane fights":
-  Topic: Snoopy vs the Baron
+  Topic: "{{ PDForum Template }}"
   Time: 10 mins
   Lead: Woodstock
   Purpose: Support

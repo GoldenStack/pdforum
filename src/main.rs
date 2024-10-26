@@ -1,50 +1,101 @@
-use std::{collections::HashMap, path::{Path, PathBuf}, time::Instant};
+use std::{collections::HashMap, path::{Path, PathBuf}, sync::Arc, time::Instant};
 
 use chrono::{DateTime, Datelike, FixedOffset, Local, Utc};
+use comemo::{track, Track, Validate};
 use parking_lot::Mutex;
-use typst::{diag::{FileError, FileResult}, foundations::{Bytes, Datetime, Smart}, syntax::{FileId, Source, VirtualPath}, text::{Font, FontBook}, utils::LazyHash, Library, World};
-use typst_kit::{download::{Downloader, ProgressSink}, fonts::{FontSlot, Fonts}, package::PackageStorage};
+use typst::{diag::{FileError, FileResult, SourceResult}, engine::{Engine, Route, Sink, Traced}, eval::eval, foundations::{Bytes, Datetime, Smart, StyleChain}, introspection::Introspector, layout::layout_document, model::Document, syntax::{FileId, Source, VirtualPath}, text::{Font, FontBook}, utils::LazyHash, Library, World};
+use typst_kit::fonts::{FontSlot, Fonts};
 use typst_pdf::{PdfOptions, PdfStandards};
 
-fn main() {
-    let start = Instant::now();
+use anyhow::Result;
+use axum::{body::Body, http::{header::{CONTENT_TYPE, SET_COOKIE}, Request}, routing::get, Router};
 
-    let mut world = FWorld::new("example.typ".into());
+#[tokio::main]
+async fn main() -> Result<()> {
 
-    let end = Instant::now();
-    println!("[WRLD] {:?}", end - start);
-    let start = Instant::now();
+    let read: fn(FileId) -> FileResult<Vec<u8>> = |id| {
+        let rootless = id.vpath().as_rootless_path();
 
+        if rootless == Path::new("data.txt") {
+            let str = r#"
+AUTHOR HERE
+1
+1 min ago
+This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
+AUTHOR HERE
+2
+2 min ago
+This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
+AUTHOR HERE
+3
+5 min ago
+This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
+AUTHOR HERE
+4
+8 min ago
+This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
+"#.trim();
+            return Ok(format!("{str}{:?}", Instant::now()).into_bytes());
+        }
 
-    let document: typst::model::Document = typst::compile(&mut world).output.unwrap();
-    world.slot(world.main, |s| s.reset());
+        if rootless == Path::new("example.typ") {
+            let s = include_str!("../example.typ");
 
-    let end = Instant::now();
-    println!("[COMP] {:?}", end - start);
-    let start = Instant::now();
+            return Ok(s.as_bytes().to_owned());
+        }
 
-    let document: typst::model::Document = typst::compile(&mut world).output.unwrap();
-    world.slot(world.main, |s| s.reset());
-
-    let end = Instant::now();
-    println!("[CMP2] {:?}", end - start);
-    let start = Instant::now();
-
-    let options = PdfOptions {
-        ident: Smart::Auto,
-        timestamp: world.today(None),
-        page_ranges: None,
-        standards: PdfStandards::default()
+        println!("NEW FILE: {:?}, \t{:?}, \t{:?}", id.vpath(), id.vpath().as_rootless_path(), id.package());
+        Err(FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
     };
-    let buffer = typst_pdf::pdf(&document, &options).unwrap();
-    let end = Instant::now();
-    println!("[RNDR] {:?}", end - start);
-    let start = Instant::now();
 
-    std::fs::write(PathBuf::from("example.pdf"), &buffer).unwrap();
+    let world = FWorld::new("example.typ".into(), read);
 
-    let end = Instant::now();
-    println!("[SAVE] {:?}", end - start);
+    let lock = Arc::new(std::sync::Mutex::new(world));
+
+    let homepage = |request: Request<Body>| async move {
+        let mut world = lock.lock().unwrap();
+
+        let start = Instant::now();
+        let document: typst::model::Document = compile(&mut world).unwrap();
+        let end = Instant::now();
+        println!("[CMP] {:?}", end - start);
+
+
+        let text = world.slots.get_mut().keys()
+        .filter(|key| key.vpath().as_rootless_path() == Path::new("data.txt"))
+        .next().unwrap().clone();
+        world.slot(text.clone(), |s| s.reset());
+    
+        let options = PdfOptions {
+            ident: Smart::Auto,
+            timestamp: world.today(None),
+            page_ranges: None,
+            standards: PdfStandards::default()
+        };
+
+        let start = Instant::now();
+        let buffer = typst_pdf::pdf(&document, &options).unwrap();
+        let end: Instant = Instant::now();
+
+        println!("[RNDR] {:?}", end - start);
+
+        // println!("COOKIES: {:?}", request.headers().get(COOKIE));
+
+        ([(CONTENT_TYPE, "application/pdf"), (SET_COOKIE, "cat=2;")], buffer)
+    };
+
+    let app = Router::new().route("/", get(homepage));
+
+    // port 1473 is the port for my previous project plus one
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:1473")
+        .await
+        .unwrap();
+
+    // help me
+    println!("unfortunately we are listening on {}", listener.local_addr().unwrap());
+    axum::serve(listener, app).await.unwrap();
+
+    Ok(())
 }
 
 /// Holds the processed data for a file ID.
@@ -74,7 +125,7 @@ impl FileSlot {
     }
 
     /// Retrieve the source for this file.
-    fn source(&mut self, read: &Read) -> FileResult<Source> {
+    fn source(&mut self, read: &fn(FileId) -> FileResult<Vec<u8>>) -> FileResult<Source> {
         self.source.get_or_init(
             || read(self.id),
             |data, prev| {
@@ -90,7 +141,7 @@ impl FileSlot {
     }
 
     /// Retrieve the file's bytes.
-    fn file(&mut self, read: &Read) -> FileResult<Bytes> {
+    fn file(&mut self, read: &fn(FileId) -> FileResult<Vec<u8>>) -> FileResult<Bytes> {
         self.file.get_or_init(
             || read(self.id),
             |data, _| Ok(data.into()),
@@ -169,17 +220,15 @@ pub struct FWorld {
     /// Locations of and storage for lazily loaded fonts.
     fonts: Vec<FontSlot>,
     /// Maps file ids to source files and buffers.
-    slots: Mutex<HashMap<FileId, FileSlot>>,
+    pub slots: Mutex<HashMap<FileId, FileSlot>>,
     /// The current datetime if requested.
     now: DateTime<Utc>,
     /// Function for reading files from the filesystem.
     read: fn(FileId) -> FileResult<Vec<u8>>,
 }
 
-pub type Read = fn(FileId) -> FileResult<Vec<u8>>;
-
 impl FWorld {
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(path: PathBuf, read: fn(FileId) -> FileResult<Vec<u8>>) -> Self {
         let root: PathBuf = path.parent().unwrap_or(Path::new(".")).into();
 
         let main_path = VirtualPath::within_root(&path, &root).unwrap();
@@ -189,24 +238,6 @@ impl FWorld {
         let fonts = Fonts::searcher()
             .include_system_fonts(true)
             .search();
-
-        let read: Read = |id| {
-            let rootless = id.vpath().as_rootless_path();
-
-            if rootless == Path::new("yagenda.typ") {
-                Ok(include_bytes!("../yagenda.typ").to_vec())
-            } else if rootless == Path::new("example.typ") {
-                let s = include_str!("../example.typ");
-
-                let replace = format!("{:?}\n", Instant::now());
-                println!("R {}", replace);
-
-                Ok(s.replace("{{ PDForum Template }}", replace.as_str()).as_bytes().to_vec())
-            } else {
-                println!("NEW FILE: {:?}, \t{:?}, \t{:?}", id.vpath(), id.vpath().as_rootless_path(), id.package());
-                Err(FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
-            }            
-        };
 
         Self {
             main,
@@ -238,6 +269,7 @@ impl FWorld {
 
 }
 
+#[track]
 impl World for FWorld {
     fn library(&self) -> &LazyHash<Library> {
         &self.library
@@ -279,4 +311,68 @@ impl World for FWorld {
             with_offset.day().try_into().ok()?,
         )
     }
+}
+
+fn compile(world: &mut FWorld) -> SourceResult<Document> {
+
+    let w: &dyn World = world;
+
+    let mut sink = Sink::new();
+
+    let world = world.track();
+
+    let traced = Traced::default();
+    let traced = traced.track();
+    let library = world.library();
+    let styles = StyleChain::new(&library.styles);
+
+    // Fetch the main source file once.
+    let main = world.main();
+    let main = world.source(main).unwrap();
+
+    // First evaluate the main source file into a module.
+    let content = eval(
+        w.track(),
+        traced,
+        sink.track_mut(),
+        Route::default().track(),
+        &main,
+    )?
+    .content();
+
+    let mut iter = 0;
+    let mut subsink;
+    let mut document = Document::default();
+
+    // Relayout until all introspections stabilize.
+    // If that doesn't happen within five attempts, we give up.
+    loop {
+        subsink = Sink::new();
+
+        let constraint = <Introspector as Validate>::Constraint::new();
+        let mut engine = Engine {
+            world: w.track(),
+            introspector: document.introspector.track_with(&constraint),
+            traced,
+            sink: subsink.track_mut(),
+            route: Route::default(),
+        };
+
+        document = layout_document(&mut engine, &content, styles)?;
+        iter += 1;
+
+        if iter > 5 || document.introspector.validate(&constraint) {
+            break;
+        }
+    }
+
+    sink.extend_from_sink(subsink);
+
+    // Promote delayed errors.
+    let delayed = sink.delayed();
+    if !delayed.is_empty() {
+        return Err(delayed);
+    }
+
+    Ok(document)
 }

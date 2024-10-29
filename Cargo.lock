@@ -1821,6 +1821,7 @@ dependencies = [
  "axum",
  "chrono",
  "comemo",
+ "ecow",
  "parking_lot",
  "tokio",
  "typst",

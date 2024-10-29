@@ -15,6 +15,7 @@ anyhow = "1.0.89"
 axum = "0.7.7"
 chrono = "0.4.38"
 comemo = "0.4.0"
+ecow = "0.2.2"
 parking_lot = "0.12.3"
 tokio = { version = "1.40.0", features = ["full"] }
 typst = "0.12.0"

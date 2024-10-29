@@ -1,11 +1,11 @@
 
-use std::{collections::HashMap, path::{Path, PathBuf}, time::Instant};
+use std::{collections::HashMap, path::{Path, PathBuf}};
 
 use chrono::{DateTime, Datelike, FixedOffset, Local, Utc};
 use comemo::track;
 use ecow::EcoVec;
 use parking_lot::Mutex;
-use typst::{compile, diag::{eco_format, FileResult, SourceDiagnostic, StrResult, Warned}, foundations::{Bytes, Datetime, Smart}, syntax::{FileId, Source, VirtualPath}, text::{Font, FontBook}, utils::LazyHash, Library, World};
+use typst::{compile, diag::{FileResult, SourceDiagnostic}, foundations::{Bytes, Datetime, Smart}, syntax::{FileId, Source, VirtualPath}, text::{Font, FontBook}, utils::LazyHash, Library, World};
 use typst_kit::fonts::{FontSlot, Fonts};
 
 use anyhow::Result;
@@ -13,25 +13,25 @@ use typst_pdf::{PdfOptions, PdfStandards};
 
 pub struct PDF {
     world: FWorld,
+    reset: Vec<VirtualPath>
 }
 
 impl PDF {
     pub fn new<M: Into<PathBuf>>(main: M, read: fn(FileId) -> FileResult<Vec<u8>>) -> Self {
         PDF {
-            world: FWorld::new(main.into(), read)
+            world: FWorld::new(main.into(), read),
+            reset: vec![VirtualPath::new("data.txt")]
         }
     }
 
     pub fn render(&mut self) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
-        let document = match compile(&mut self.world).output {
-            Ok(doc) => doc,
-            Err(errors) => return Err(errors),
-        };
+        for (key, value) in self.world.slots.get_mut() {
+            if self.reset.contains(key.vpath()) {
+                value.reset();
+            }
+        }
 
-        let text = self.world.slots.get_mut().keys()
-        .filter(|key| key.vpath().as_rootless_path() == Path::new("data.txt"))
-        .next().unwrap().clone();
-        self.world.slot(text, |s| s.reset());
+        let document = compile(&mut self.world).output?;
     
         let options = PdfOptions {
             ident: Smart::Auto,
@@ -199,9 +199,7 @@ impl FWorld {
 
     /// Reset the compilation state in preparation of a new compilation.
     pub fn reset(&mut self) {
-        for slot in self.slots.get_mut().values_mut() {
-            slot.reset();
-        }
+        self.slots.get_mut().values_mut().for_each(FileSlot::reset);
         self.now = Utc::now();
     }
 

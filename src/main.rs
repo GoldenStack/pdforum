@@ -1,9 +1,8 @@
 pub mod render;
 
-use std::{path::Path, sync::Arc, time::Instant};
+use std::{sync::Arc, time::Instant};
 
 use render::PDF;
-use typst::{diag::{FileError, FileResult}, syntax::FileId};
 
 use anyhow::Result;
 use axum::{body::Body, http::{header::{CONTENT_TYPE, SET_COOKIE}, Request}, routing::get, Router};
@@ -11,11 +10,14 @@ use axum::{body::Body, http::{header::{CONTENT_TYPE, SET_COOKIE}, Request}, rout
 #[tokio::main]
 async fn main() -> Result<()> {
 
-    let read: fn(FileId) -> FileResult<Vec<u8>> = |id| {
-        let rootless = id.vpath().as_rootless_path();
+    let main = PDF::main(include_str!("../templates/homepage.typ"));
 
-        if rootless == Path::new("data.txt") {
-            let str = r#"
+    let lock = Arc::new(std::sync::Mutex::new(main));
+
+    let homepage = |request: Request<Body>| async move {
+        let mut world = lock.lock().unwrap();
+
+        let data = r#"
 AUTHOR HERE
 1
 1 min ago
@@ -33,25 +35,8 @@ AUTHOR HERE
 8 min ago
 This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
 "#.trim();
-            return Ok(format!("{str}{:?}", Instant::now()).into_bytes());
-        }
 
-        if rootless == Path::new("homepage.typ") {
-            let s = include_str!("../templates/homepage.typ");
-
-            return Ok(s.as_bytes().to_owned());
-        }
-
-        println!("NEW FILE: {:?}, \t{:?}, \t{:?}", id.vpath(), id.vpath().as_rootless_path(), id.package());
-        Err(FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
-    };
-
-    let main = PDF::new("homepage.typ", read);
-
-    let lock = Arc::new(std::sync::Mutex::new(main));
-
-    let homepage = |request: Request<Body>| async move {
-        let mut world = lock.lock().unwrap();
+        world.write("data.txt", format!("{data}{:?}", Instant::now()).into_bytes());
 
         // TODO: Replace unwrapping with returning a prerendered 404 file.
         let buffer = world.render().unwrap();

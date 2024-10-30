@@ -5,7 +5,7 @@ use chrono::{DateTime, Datelike, FixedOffset, Local, Utc};
 use comemo::track;
 use ecow::EcoVec;
 use parking_lot::Mutex;
-use typst::{compile, diag::{FileResult, SourceDiagnostic}, foundations::{Bytes, Datetime, Smart}, syntax::{FileId, Source, VirtualPath}, text::{Font, FontBook}, utils::LazyHash, Library, World};
+use typst::{compile, diag::{FileError, FileResult, SourceDiagnostic}, foundations::{Bytes, Datetime, Smart}, syntax::{FileId, Source, VirtualPath}, text::{Font, FontBook}, utils::LazyHash, Library, World};
 use typst_kit::fonts::{FontSlot, Fonts};
 
 use anyhow::Result;
@@ -36,7 +36,7 @@ impl FileSlot {
     }
 
     /// Retrieve the source for this file.
-    fn source(&mut self, id: FileId, read: &fn(FileId) -> FileResult<Vec<u8>>) -> FileResult<Source> {
+    fn source<F: Fn(FileId) -> FileResult<Vec<u8>>>(&mut self, id: FileId, read: F) -> FileResult<Source> {
         self.source.get_or_init(
             || read(id),
             |data, prev| {
@@ -52,7 +52,7 @@ impl FileSlot {
     }
 
     /// Retrieve the file's bytes.
-    fn file(&mut self, id: FileId, read: &fn(FileId) -> FileResult<Vec<u8>>) -> FileResult<Bytes> {
+    fn file<F: Fn(FileId) -> FileResult<Vec<u8>>>(&mut self, id: FileId, read: F) -> FileResult<Bytes> {
         self.file.get_or_init(
             || read(id),
             |data, _| Ok(data.into()),
@@ -135,13 +135,18 @@ pub struct PDF {
     /// The current datetime if requested.
     now: DateTime<Utc>,
     /// Function for reading files from the filesystem.
-    read: fn(FileId) -> FileResult<Vec<u8>>,
-    /// The list of files to be reset between each render.
-    reset: Vec<VirtualPath>,
+    read: HashMap<VirtualPath, Vec<u8>>,
 }
 
 impl PDF {
-    pub fn new<M: Into<PathBuf>>(main: M, read: fn(FileId) -> FileResult<Vec<u8>>) -> Self {
+
+    pub fn main<I: Into<Vec<u8>>>(data: I) -> Self {
+        let mut pdf = Self::new("main.typ");
+        pdf.write("main.typ", data);
+        pdf
+    }
+
+    pub fn new<M: Into<PathBuf>>(main: M) -> Self {
         let path = main.into();
         let root: PathBuf = path.parent().unwrap_or(Path::new(".")).into();
 
@@ -160,18 +165,23 @@ impl PDF {
             fonts: fonts.fonts,
             slots: Mutex::new(HashMap::new()),
             now: Utc::now(),
-            read,
-            reset: vec![VirtualPath::new("data.txt")],
+            read: HashMap::new(),
         }
     }
 
-    pub fn render(&mut self) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
+    pub fn write<M: Into<PathBuf>, I: Into<Vec<u8>>>(&mut self, path: M, data: I) {
+        let vpath = VirtualPath::new(path.into());
+
         for (key, value) in self.slots.get_mut() {
-            if self.reset.contains(key.vpath()) {
+            if key.vpath() == &vpath {
                 value.reset();
             }
         }
 
+        self.read.insert(vpath, data.into());
+    }
+
+    pub fn render(&mut self) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
         let document = compile(self).output?;
     
         let options = PdfOptions {
@@ -199,6 +209,10 @@ impl PDF {
         f(map.entry(id).or_insert_with(FileSlot::new))
     }
 
+    fn try_read(&self, id: FileId) -> FileResult<Vec<u8>> {
+        self.read.get(id.vpath()).cloned().ok_or_else(|| FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
+    }
+
 }
 
 #[track]
@@ -216,13 +230,11 @@ impl World for PDF {
     }
 
     fn source(&self, id: FileId) -> FileResult<Source> {
-        println!("SRC: {id:?}");
-        self.slot(id, |slot| slot.source(id, &self.read))
+        self.slot(id, |slot| slot.source(id, |id| self.try_read(id)))
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        println!("FLE: {id:?}");
-        self.slot(id, |slot| slot.file(id, &self.read))
+        self.slot(id, |slot| slot.file(id, |id| self.try_read(id)))
     }
 
     fn font(&self, index: usize) -> Option<Font> {

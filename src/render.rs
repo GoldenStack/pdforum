@@ -50,8 +50,6 @@ impl PDF {
 /// Both fields can be populated if the file is both imported and read().
 #[derive(Debug)]
 struct FileSlot {
-    /// The slot's file id.
-    id: FileId,
     /// The lazily loaded and incrementally updated source file.
     source: SlotCell<Source>,
     /// The lazily loaded raw byte buffer.
@@ -60,8 +58,8 @@ struct FileSlot {
 
 impl FileSlot {
     /// Create a new file slot.
-    fn new(id: FileId) -> Self {
-        Self { id, file: SlotCell::new(), source: SlotCell::new() }
+    fn new() -> Self {
+        Self { file: SlotCell::new(), source: SlotCell::new() }
     }
 
     /// Marks the file as not yet accessed in preparation of the next
@@ -72,25 +70,25 @@ impl FileSlot {
     }
 
     /// Retrieve the source for this file.
-    fn source(&mut self, read: &fn(FileId) -> FileResult<Vec<u8>>) -> FileResult<Source> {
+    fn source(&mut self, id: FileId, read: &fn(FileId) -> FileResult<Vec<u8>>) -> FileResult<Source> {
         self.source.get_or_init(
-            || read(self.id),
+            || read(id),
             |data, prev| {
                 let text = decode_utf8(&data)?;
                 if let Some(mut prev) = prev {
                     prev.replace(text);
                     Ok(prev)
                 } else {
-                    Ok(Source::new(self.id, text.into()))
+                    Ok(Source::new(id, text.into()))
                 }
             },
         )
     }
 
     /// Retrieve the file's bytes.
-    fn file(&mut self, read: &fn(FileId) -> FileResult<Vec<u8>>) -> FileResult<Bytes> {
+    fn file(&mut self, id: FileId, read: &fn(FileId) -> FileResult<Vec<u8>>) -> FileResult<Bytes> {
         self.file.get_or_init(
-            || read(self.id),
+            || read(id),
             |data, _| Ok(data.into()),
         )
     }
@@ -167,7 +165,7 @@ pub struct FWorld {
     /// Locations of and storage for lazily loaded fonts.
     fonts: Vec<FontSlot>,
     /// Maps file ids to source files and buffers.
-    pub slots: Mutex<HashMap<FileId, FileSlot>>,
+    slots: Mutex<HashMap<FileId, FileSlot>>,
     /// The current datetime if requested.
     now: DateTime<Utc>,
     /// Function for reading files from the filesystem.
@@ -209,7 +207,7 @@ impl FWorld {
         F: FnOnce(&mut FileSlot) -> T,
     {
         let mut map = self.slots.lock();
-        f(map.entry(id).or_insert_with(|| FileSlot::new(id)))
+        f(map.entry(id).or_insert_with(FileSlot::new))
     }
 
 }
@@ -229,11 +227,11 @@ impl World for FWorld {
     }
 
     fn source(&self, id: FileId) -> FileResult<Source> {
-        self.slot(id, |slot| slot.source(&self.read))
+        self.slot(id, |slot| slot.source(id, &self.read))
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        self.slot(id, |slot| slot.file(&self.read))
+        self.slot(id, |slot| slot.file(id, &self.read))
     }
 
     fn font(&self, index: usize) -> Option<Font> {

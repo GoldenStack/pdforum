@@ -11,40 +11,6 @@ use typst_kit::fonts::{FontSlot, Fonts};
 use anyhow::Result;
 use typst_pdf::{PdfOptions, PdfStandards};
 
-pub struct PDF {
-    world: FWorld,
-    reset: Vec<VirtualPath>
-}
-
-impl PDF {
-    pub fn new<M: Into<PathBuf>>(main: M, read: fn(FileId) -> FileResult<Vec<u8>>) -> Self {
-        PDF {
-            world: FWorld::new(main.into(), read),
-            reset: vec![VirtualPath::new("data.txt")]
-        }
-    }
-
-    pub fn render(&mut self) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
-        for (key, value) in self.world.slots.get_mut() {
-            if self.reset.contains(key.vpath()) {
-                value.reset();
-            }
-        }
-
-        let document = compile(&mut self.world).output?;
-    
-        let options = PdfOptions {
-            ident: Smart::Auto,
-            timestamp: self.world.today(None),
-            page_ranges: None,
-            standards: PdfStandards::default()
-        };
-
-        typst_pdf::pdf(&document, &options)
-    }
-
-}
-
 /// Holds the processed data for a file ID.
 ///
 /// Both fields can be populated if the file is both imported and read().
@@ -155,7 +121,7 @@ impl<T: Clone> SlotCell<T> {
     }
 }
 
-pub struct FWorld {
+pub struct PDF {
     /// The input path.
     main: FileId,
     /// Typst's standard library.
@@ -170,10 +136,13 @@ pub struct FWorld {
     now: DateTime<Utc>,
     /// Function for reading files from the filesystem.
     read: fn(FileId) -> FileResult<Vec<u8>>,
+    /// The list of files to be reset between each render.
+    reset: Vec<VirtualPath>,
 }
 
-impl FWorld {
-    pub fn new(path: PathBuf, read: fn(FileId) -> FileResult<Vec<u8>>) -> Self {
+impl PDF {
+    pub fn new<M: Into<PathBuf>>(main: M, read: fn(FileId) -> FileResult<Vec<u8>>) -> Self {
+        let path = main.into();
         let root: PathBuf = path.parent().unwrap_or(Path::new(".")).into();
 
         let main_path = VirtualPath::within_root(&path, &root).unwrap();
@@ -192,7 +161,27 @@ impl FWorld {
             slots: Mutex::new(HashMap::new()),
             now: Utc::now(),
             read,
+            reset: vec![VirtualPath::new("data.txt")],
         }
+    }
+
+    pub fn render(&mut self) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
+        for (key, value) in self.slots.get_mut() {
+            if self.reset.contains(key.vpath()) {
+                value.reset();
+            }
+        }
+
+        let document = compile(self).output?;
+    
+        let options = PdfOptions {
+            ident: Smart::Auto,
+            timestamp: self.today(None),
+            page_ranges: None,
+            standards: PdfStandards::default()
+        };
+
+        typst_pdf::pdf(&document, &options)
     }
 
     /// Reset the compilation state in preparation of a new compilation.
@@ -213,7 +202,7 @@ impl FWorld {
 }
 
 #[track]
-impl World for FWorld {
+impl World for PDF {
     fn library(&self) -> &LazyHash<Library> {
         &self.library
     }
@@ -227,10 +216,12 @@ impl World for FWorld {
     }
 
     fn source(&self, id: FileId) -> FileResult<Source> {
+        println!("SRC: {id:?}");
         self.slot(id, |slot| slot.source(id, &self.read))
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
+        println!("FLE: {id:?}");
         self.slot(id, |slot| slot.file(id, &self.read))
     }
 

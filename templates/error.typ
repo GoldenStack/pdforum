@@ -5,6 +5,8 @@
   (data.slice(0, start), data.slice(start))
 }
 
+#set document(title: "Error " + data.at(0) + " | PDForum")
+
 #align(center + horizon)[
   #text(size: 10em)[
     #data.at(0)

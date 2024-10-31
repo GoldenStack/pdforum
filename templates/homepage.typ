@@ -1,3 +1,5 @@
+#set document(title: "PDForum")
+
 #set text(size: 10pt, weight: "regular", style: "normal")
 
 #let url = "https://pdforum.meow.i.ng"

@@ -194,6 +194,11 @@ impl PDF {
         typst_pdf::pdf(&document, &options)
     }
 
+    pub fn render_with_data<I: Into<Vec<u8>>>(&mut self, data: I) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
+        self.write("data.txt", data);
+        self.render()
+    }
+
     /// Reset the compilation state in preparation of a new compilation.
     pub fn reset(&mut self) {
         self.slots.get_mut().values_mut().for_each(FileSlot::reset);

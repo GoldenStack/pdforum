@@ -47,12 +47,47 @@ AUTHOR HERE
 4
 8 min ago
 This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
+AUTHOR HERE
+1
+1 min ago
+This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
+AUTHOR HERE
+2
+2 min ago
+This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
+AUTHOR HERE
+3
+5 min ago
+This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
+AUTHOR HERE
+4
+8 min ago
+This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
+AUTHOR HERE
+1
+1 min ago
+This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
+AUTHOR HERE
+2
+2 min ago
+This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
+AUTHOR HERE
+3
+5 min ago
+This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
+AUTHOR HERE
+4
+8 min ago
+This is a post! There is text here that is rendering on your screen right now. It's really incredible, isn't it??
 "#.trim();
         
         let data = format!("{data}{:?}", Instant::now());
 
+        let start = Instant::now();
         let buffer = lock.lock().ok()
             .and_then(|mut main| main.render_with_data(data).ok());
+        let end = Instant::now();
+        println!("[RND] Took {:?}", end - start);
 
         if let Some(content) = buffer {
             (

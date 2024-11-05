@@ -3,7 +3,7 @@
     #align(center)[
       #show link: underline
       
-      #smallcaps(lower(link(url + "/home")[HOME] + h(5%) + link(url + "/browse")[BROWSE] + h(5%) + link(url + "/announcements")[ANNOUNCEMENTS] + h(5%) + {
+      #smallcaps(lower(link(url + "/")[HOME] + h(5%) + link(url + "/browse")[BROWSE] + h(5%) + link(url + "/announcements")[ANNOUNCEMENTS] + h(5%) + {
         if signed-in {
           link(url + "/account")[ACCOUNT] + h(5%) + link(url + "/settings")[SETTINGS]
         } else {

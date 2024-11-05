@@ -6,7 +6,7 @@ use ecow::EcoVec;
 use render::PDF;
 
 use anyhow::Result;
-use axum::{body::Body, http::{header::{CONTENT_TYPE, SET_COOKIE}, Request, StatusCode}, response::IntoResponse, routing::get, Router};
+use axum::{body::Body, http::{header::CONTENT_TYPE, Request, StatusCode}, routing::get, Router};
 use typst::diag::SourceDiagnostic;
 
 #[tokio::main]
@@ -25,7 +25,8 @@ async fn main() -> Result<()> {
         error404
     );
 
-    let main = PDF::main(include_str!("../templates/homepage.typ"));
+    let mut main = PDF::main(include_str!("../templates/browse.typ"));
+    main.write("header.typ", include_str!("../templates/header.typ"));
 
     let lock = Arc::new(std::sync::Mutex::new(main));
 
@@ -83,27 +84,29 @@ This is a post! There is text here that is rendering on your screen right now. I
         
         let data = format!("{data}{:?}", Instant::now());
 
-        let start = Instant::now();
+        let auth = true;
+
         let buffer = lock.lock().ok()
-            .and_then(|mut main| main.render_with_data(data).ok());
-        let end = Instant::now();
-        println!("[RND] Took {:?}", end - start);
+            .and_then(|mut main| {
+                main.write("info.yml", format!("url: \"http://localhost:1473\"\nauth: {auth}"));
+
+                Some(main.render_with_data(data).unwrap())
+            });
+
 
         if let Some(content) = buffer {
             (
-                StatusCode::OK,
-                [(CONTENT_TYPE, "application/pdf"), (SET_COOKIE, "cat=2;")],
+               StatusCode::OK,
+                [(CONTENT_TYPE, "application/pdf")],
                 content
-            ).into_response()
+            )
         } else {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 [(CONTENT_TYPE, "application/pdf")],
                 Vec::clone(error500.as_ref())
-            ).into_response()
+            )
         }
-
-        // println!("COOKIES: {:?}", request.headers().get(COOKIE));
     };
     
 

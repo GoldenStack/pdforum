@@ -13,6 +13,7 @@ readme = "README.md"
 [dependencies]
 anyhow = "1.0.89"
 axum = "0.7.7"
+axum-extra = { version = "0.9.4", features = ["cookie"] }
 chrono = "0.4.38"
 comemo = "0.4.0"
 ecow = "0.2.2"

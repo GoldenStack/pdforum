@@ -51,17 +51,17 @@
     #box(width: 1fr)[
       #align(left)[
         #h(2em)
-        #smallcaps(lower("Web A-1a"))
+        #smallcaps("web a-1a")
       ]
     ]
     #box(width: 1fr)[   
       #align(center)[
-        #smallcaps(lower(datetime.today().display("[weekday], [month repr:long] [day padding:none], [year]")))
+        #smallcaps(datetime.today().display("[weekday], [month repr:long] [day padding:none], [year]"))
       ]
     ]
     #box(width: 1fr)[
       #align(right)[
-        #smallcaps(lower("PDF edition"))
+        #smallcaps("pdf edition")
         #h(2em)
       ] 
     ]

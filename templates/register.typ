@@ -29,19 +29,20 @@
 
 #align(center, {
   align(left, {
-    v(5%)
-    text(size: 24pt)[
-      #h(8pt)
-      Username
+    v(4%)
+    
+    text(size: 18pt, fill: luma(80))[
+      #h(5.5pt)
+      ALIAS
     ]
 
-    v(-2%)
-    
+    v(-3%)
+
     grid(
       inset: 8pt,
       columns: (1fr, auto),
-      user-input(text(size: 24pt, data + strong[|])),
-      link(info.url + "", button(text(size: 24pt, "continue"), auto))
+      button(text(font: "New Computer Modern", size: 24pt, data + strong[$bracket.b$]), 100%),
+      key(align(center, text(size: 24pt, $arrow.l.hook$)), info.url + "/")
     )
 
     keyboard(info.url + "/register/")

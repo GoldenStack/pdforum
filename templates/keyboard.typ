@@ -1,59 +1,62 @@
 // thank you keyle :)
-#let user-input(content) = {
+#let button(content, width, url: none) = {
+  let text-color = black
   let stroke-color = rgb("#555")
-  let fill-color = rgb("#fff")
-  let layers = 2
+  let bg-color = rgb("#fff")
 
-  content = align(horizon, content)
-  
   let cust-rect = rect.with(
-    inset: (x: 10pt, y: 10pt),
-    width: 100%,
-    stroke: stroke-color + 0.6pt,
-    radius: 2pt,
-    fill: fill-color,
-  )
-  let button = cust-rect(
-    text(fill: black, content),
-  )
-  let shadow = cust-rect(
-    fill: stroke-color,
-    text(fill: fill-color, content),
-  )
-  for n in range(layers) {
-    place(dx: 0.6pt * n, dy: 0.6pt * n, shadow)
-  }
-  button
-}
-
-#let button(content, width) = {
-  let stroke-color = rgb("#555")
-  let fill-color = rgb("#eee")
-  let layers = 2
-
-  content = align(center + horizon, content)
-  
-  let cust-rect = rect.with(
-    inset: (x: 10pt, y: 10pt),
     width: width,
-    stroke: stroke-color + 0.6pt,
-    radius: 2pt,
-    fill: fill-color,
+    height: 36pt,
+    stroke: stroke-color,
+    fill: bg-color,
   )
+
   let button = cust-rect(
-    text(fill: black, content),
+    align(horizon, text(fill: text-color, content)),
   )
   let shadow = cust-rect(
-    fill: stroke-color,
-    text(fill: fill-color, content),
+    outset: 2.2pt,
+    fill: bg-color,
+    stroke: stroke-color + 1.2pt,
+    align(horizon, text(fill: text-color, content)),
   )
-  for n in range(layers) {
-    place(dx: 0.6pt * n, dy: 0.6pt * n, shadow)
+  {
+    place(shadow)
+    if url == none {
+      button
+    } else {    
+      link(url, button)
+    }
   }
-  button
 }
 
-#let key(content) = button(content, 40pt)
+#let key(content, url) = {
+  let text-color = white
+  let bg-color = rgb("#333")
+  let stroke-color = rgb("#2b2b2b")
+
+  let cust-rect = rect.with(
+    width: 36pt,
+    height: 36pt,
+    stroke: bg-color,
+    fill: stroke-color,
+    radius: 50%,
+  )
+
+  let button = cust-rect(
+    align(center + horizon, text(fill: white, content)),
+  )
+  let shadow = cust-rect(
+    outset: 2.2pt,
+    fill: white,
+    stroke: stroke-color + 1.2pt,
+    align(center + horizon, text(fill: white, content)),
+  )
+  {
+    place(shadow)
+    link(url, button)
+  }
+}
 
 #let keyboard(url) = {
   let row(url, chars: (), left-pad: 0fr, right-pad: 0fr) = {
@@ -62,11 +65,12 @@
       inset: 5pt,
       align: left,
       "",
-      ..chars.map(t => text(size: 36pt, t)).map(key).zip(chars).map(pair => link(url + pair.at(1), upper(pair.at(0))))
+      ..chars.map(x => key(text(size: 28pt, upper(x)), url + x)),
+      ""
     )
   }
 
-  row(url, chars: "qwertyuiop".codepoints())
+  row(url, chars: "qwertyuiop".codepoints(), left-pad: 1fr, right-pad: 1fr)
   row(url, chars: "asdfghjkl".codepoints(), left-pad: 0.25fr, right-pad: 0.25fr)
   row(url, chars: "zxcvbnm".codepoints(), left-pad: 0.5fr, right-pad: 0.75fr)
 }

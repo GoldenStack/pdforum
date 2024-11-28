@@ -1,5 +1,5 @@
 
-use std::{collections::HashMap, path::{Path, PathBuf}};
+use std::{collections::HashMap, path::{Path, PathBuf}, time::Instant};
 
 use chrono::{DateTime, Datelike, FixedOffset, Local, Utc};
 use comemo::track;
@@ -10,24 +10,6 @@ use typst_kit::fonts::{FontSlot, Fonts};
 
 use anyhow::Result;
 use typst_pdf::{PdfOptions, PdfStandards};
-
-/// Holds the processed data for a file ID.
-///
-/// Both fields can be populated if the file is both imported and read().
-#[derive(Debug)]
-struct FileSlot {
-    /// The lazily loaded and incrementally updated source file.
-    source: SlotCell<Source>,
-    /// The lazily loaded raw byte buffer.
-    file: SlotCell<Bytes>,
-}
-
-impl FileSlot {
-    /// Create a new file slot.
-    fn new() -> Self {
-        Self { file: SlotCell::new(), source: SlotCell::new() }
-    }
-}
 
 /// Lazily processes data for a file.
 #[derive(Debug)]
@@ -55,8 +37,8 @@ impl<T: Clone> SlotCell<T> {
     /// Gets the contents of the cell or initialize them.
     fn get_or_init(
         &mut self,
-        load: impl FnOnce() -> FileResult<Vec<u8>>,
-        f: impl FnOnce(Vec<u8>, Option<T>) -> FileResult<T>,
+        load: impl FnOnce() -> FileResult<Bytes>,
+        f: impl FnOnce(Bytes, Option<T>) -> FileResult<T>,
     ) -> FileResult<T> {
         // If we accessed the file already in this compilation, retrieve it.
         if std::mem::replace(&mut self.accessed, true) {
@@ -94,11 +76,11 @@ pub struct PDF {
     /// Locations of and storage for lazily loaded fonts.
     fonts: Vec<FontSlot>,
     /// Maps file ids to source files and buffers.
-    slots: Mutex<HashMap<FileId, FileSlot>>,
+    slots: Mutex<HashMap<FileId, SlotCell<Source>>>,
     /// The current datetime if requested.
     now: DateTime<Utc>,
     /// Function for reading files from the filesystem.
-    read: HashMap<VirtualPath, Vec<u8>>,
+    read: HashMap<VirtualPath, Bytes>,
 }
 
 impl PDF {
@@ -137,12 +119,11 @@ impl PDF {
 
         for (key, value) in self.slots.get_mut() {
             if key.vpath() == &vpath {
-                value.file.reset();
-                value.source.reset();
+                value.reset();
             }
         }
 
-        self.read.insert(vpath, data.into());
+        self.read.insert(vpath, data.into().into());
     }
 
     pub fn render(&mut self) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
@@ -162,20 +143,6 @@ impl PDF {
         self.write("data.txt", data);
         self.render()
     }
-
-    /// Access the canonical slot for the given file id.
-    fn slot<F, T>(&self, id: FileId, f: F) -> T
-    where
-        F: FnOnce(&mut FileSlot) -> T,
-    {
-        let mut map = self.slots.lock();
-        f(map.entry(id).or_insert_with(FileSlot::new))
-    }
-
-    fn try_read(&self, id: FileId) -> FileResult<Vec<u8>> {
-        self.read.get(id.vpath()).cloned().ok_or_else(|| FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
-    }
-
 }
 
 #[track]
@@ -193,30 +160,30 @@ impl World for PDF {
     }
 
     fn source(&self, id: FileId) -> FileResult<Source> {
-        self.slot(id, |slot| {
-            slot.source.get_or_init(
-                || self.try_read(id),
-                |data, prev| {
-                    let text = std::str::from_utf8(&data)?;
+        let mut map = self.slots.lock();
+        let slot = map.entry(id).or_insert_with(SlotCell::new);
 
-                    if let Some(mut prev) = prev {
-                        prev.replace(text);
-                        Ok(prev)
-                    } else {
-                        Ok(Source::new(id, text.into()))
-                    }
-                },
-            )
-        })
+        slot.get_or_init(
+            || self.file(id),
+            |data, prev| {
+                let text = std::str::from_utf8(&data)?;
+
+                if let Some(mut prev) = prev {
+                    prev.replace(text);
+                    Ok(prev)
+                } else {
+                    Ok(Source::new(id, text.into()))
+                }
+            },
+        )
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        self.slot(id, |slot| {
-            slot.file.get_or_init(
-                || self.try_read(id),
-                |data, _| Ok(data.into()),
-            )
-        })
+        if let Some(bytes) = self.read.get(id.vpath()) {
+            Ok(bytes.clone())
+        } else {
+            Err(FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
+        }
     }
 
     fn font(&self, index: usize) -> Option<Font> {

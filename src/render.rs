@@ -27,43 +27,6 @@ impl FileSlot {
     fn new() -> Self {
         Self { file: SlotCell::new(), source: SlotCell::new() }
     }
-
-    /// Marks the file as not yet accessed in preparation of the next
-    /// compilation.
-    fn reset(&mut self) {
-        self.source.reset();
-        self.file.reset();
-    }
-
-    /// Retrieve the source for this file.
-    fn source<F: Fn(FileId) -> FileResult<Vec<u8>>>(&mut self, id: FileId, read: F) -> FileResult<Source> {
-        self.source.get_or_init(
-            || read(id),
-            |data, prev| {
-                let text = decode_utf8(&data)?;
-                if let Some(mut prev) = prev {
-                    prev.replace(text);
-                    Ok(prev)
-                } else {
-                    Ok(Source::new(id, text.into()))
-                }
-            },
-        )
-    }
-
-    /// Retrieve the file's bytes.
-    fn file<F: Fn(FileId) -> FileResult<Vec<u8>>>(&mut self, id: FileId, read: F) -> FileResult<Bytes> {
-        self.file.get_or_init(
-            || read(id),
-            |data, _| Ok(data.into()),
-        )
-    }
-}
-
-/// Decode UTF-8 with an optional BOM.
-fn decode_utf8(buf: &[u8]) -> FileResult<&str> {
-    // Remove UTF-8 BOM.
-    Ok(std::str::from_utf8(buf.strip_prefix(b"\xef\xbb\xbf").unwrap_or(buf))?)
 }
 
 /// Lazily processes data for a file.
@@ -174,7 +137,8 @@ impl PDF {
 
         for (key, value) in self.slots.get_mut() {
             if key.vpath() == &vpath {
-                value.reset();
+                value.file.reset();
+                value.source.reset();
             }
         }
 
@@ -197,12 +161,6 @@ impl PDF {
     pub fn render_with_data<I: Into<Vec<u8>>>(&mut self, data: I) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
         self.write("data.txt", data);
         self.render()
-    }
-
-    /// Reset the compilation state in preparation of a new compilation.
-    pub fn reset(&mut self) {
-        self.slots.get_mut().values_mut().for_each(FileSlot::reset);
-        self.now = Utc::now();
     }
 
     /// Access the canonical slot for the given file id.
@@ -235,11 +193,30 @@ impl World for PDF {
     }
 
     fn source(&self, id: FileId) -> FileResult<Source> {
-        self.slot(id, |slot| slot.source(id, |id| self.try_read(id)))
+        self.slot(id, |slot| {
+            slot.source.get_or_init(
+                || self.try_read(id),
+                |data, prev| {
+                    let text = std::str::from_utf8(&data)?;
+
+                    if let Some(mut prev) = prev {
+                        prev.replace(text);
+                        Ok(prev)
+                    } else {
+                        Ok(Source::new(id, text.into()))
+                    }
+                },
+            )
+        })
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        self.slot(id, |slot| slot.file(id, |id| self.try_read(id)))
+        self.slot(id, |slot| {
+            slot.file.get_or_init(
+                || self.try_read(id),
+                |data, _| Ok(data.into()),
+            )
+        })
     }
 
     fn font(&self, index: usize) -> Option<Font> {

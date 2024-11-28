@@ -11,17 +11,16 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.89"
-axum = "0.7.7"
-axum-extra = { version = "0.9.4", features = ["cookie"] }
+anyhow = "1.0.93"
+axum = "0.7.9"
+axum-extra = { version = "0.9.6", features = ["cookie"] }
 chrono = "0.4.38"
 comemo = "0.4.0"
-ecow = "0.2.2"
+ecow = "0.2.3"
 parking_lot = "0.12.3"
-tokio = { version = "1.40.0", features = ["full"] }
+tokio = { version = "1.41.1", features = ["full"] }
 typst = "0.12.0"
 typst-assets = "0.12.0"
 typst-cli = "0.12.0"
 typst-kit = "0.12.0"
 typst-pdf = "0.12.0"
-

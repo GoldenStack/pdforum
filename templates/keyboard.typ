@@ -4,9 +4,10 @@
   let stroke-color = rgb("#555")
   let bg-color = rgb("#fff")
 
+  let content = pad(y: 4pt, content)
+
   let cust-rect = rect.with(
     width: width,
-    height: 36pt,
     stroke: stroke-color,
     fill: bg-color,
   )

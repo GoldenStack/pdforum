@@ -1,70 +1,14 @@
 
-use std::{collections::HashMap, path::{Path, PathBuf}, time::Instant};
+use std::{collections::HashMap, path::{Path, PathBuf}};
 
 use chrono::{DateTime, Datelike, FixedOffset, Local, Utc};
 use comemo::track;
 use ecow::EcoVec;
-use parking_lot::Mutex;
 use typst::{compile, diag::{FileError, FileResult, SourceDiagnostic}, foundations::{Bytes, Datetime, Smart}, syntax::{FileId, Source, VirtualPath}, text::{Font, FontBook}, utils::LazyHash, Library, World};
 use typst_kit::fonts::{FontSlot, Fonts};
 
 use anyhow::Result;
 use typst_pdf::{PdfOptions, PdfStandards};
-
-/// Lazily processes data for a file.
-#[derive(Debug)]
-struct SlotCell<T> {
-    /// The processed data.
-    data: Option<FileResult<T>>,
-    /// A hash of the raw file contents / access error.
-    fingerprint: u128,
-    /// Whether the slot has been accessed in the current compilation.
-    accessed: bool,
-}
-
-impl<T: Clone> SlotCell<T> {
-    /// Creates a new, empty cell.
-    fn new() -> Self {
-        Self { data: None, fingerprint: 0, accessed: false }
-    }
-
-    /// Marks the cell as not yet accessed in preparation of the next
-    /// compilation.
-    fn reset(&mut self) {
-        self.accessed = false;
-    }
-
-    /// Gets the contents of the cell or initialize them.
-    fn get_or_init(
-        &mut self,
-        load: impl FnOnce() -> FileResult<Bytes>,
-        f: impl FnOnce(Bytes, Option<T>) -> FileResult<T>,
-    ) -> FileResult<T> {
-        // If we accessed the file already in this compilation, retrieve it.
-        if std::mem::replace(&mut self.accessed, true) {
-            if let Some(data) = &self.data {
-                return data.clone();
-            }
-        }
-
-        // Read and hash the file.
-        let result = load();
-        let fingerprint = typst::utils::hash128(&result);
-
-        // If the file contents didn't change, yield the old processed data.
-        if std::mem::replace(&mut self.fingerprint, fingerprint) == fingerprint {
-            if let Some(data) = &self.data {
-                return data.clone();
-            }
-        }
-
-        let prev = self.data.take().and_then(Result::ok);
-        let value = result.and_then(|data| f(data, prev));
-        self.data = Some(value.clone());
-
-        value
-    }
-}
 
 pub struct PDF {
     /// The input path.
@@ -75,19 +19,19 @@ pub struct PDF {
     book: LazyHash<FontBook>,
     /// Locations of and storage for lazily loaded fonts.
     fonts: Vec<FontSlot>,
-    /// Maps file ids to source files and buffers.
-    slots: Mutex<HashMap<FileId, SlotCell<Source>>>,
     /// The current datetime if requested.
     now: DateTime<Utc>,
-    /// Function for reading files from the filesystem.
-    read: HashMap<VirtualPath, Bytes>,
+    /// Fake isolated filesystem
+    files: HashMap<FileId, Bytes>,
+    /// Fake isolated filesystem but exclusively storing source files
+    sources: HashMap<FileId, Source>
 }
 
 impl PDF {
 
-    pub fn main<I: Into<Vec<u8>>>(data: I) -> Self {
+    pub fn main<I: Into<String>>(data: I) -> Self {
         let mut pdf = Self::new("main.typ");
-        pdf.write("main.typ", data);
+        pdf.write_source("main.typ", data);
         pdf
     }
 
@@ -108,22 +52,29 @@ impl PDF {
             library: LazyHash::new(Library::default()),
             book: LazyHash::new(fonts.book),
             fonts: fonts.fonts,
-            slots: Mutex::new(HashMap::new()),
             now: Utc::now(),
-            read: HashMap::new(),
+            files: HashMap::new(),
+            sources: HashMap::new(),
         }
     }
 
     pub fn write<M: Into<PathBuf>, I: Into<Vec<u8>>>(&mut self, path: M, data: I) {
         let vpath = VirtualPath::new(path.into());
 
-        for (key, value) in self.slots.get_mut() {
-            if key.vpath() == &vpath {
-                value.reset();
-            }
-        }
+        let id = FileId::new(None, vpath);
 
-        self.read.insert(vpath, data.into().into());
+        self.files.insert(id, data.into().into());
+    }
+
+    pub fn write_source<M: Into<PathBuf>, I: Into<String>>(&mut self, path: M, data: I) {
+        let vpath = VirtualPath::new(path.into());
+        
+        let id = FileId::new(None, vpath);
+
+        let data = data.into();
+
+        self.files.insert(id, data.as_bytes().into());
+        self.sources.insert(id, Source::new(id, data));
     }
 
     pub fn render(&mut self) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
@@ -160,30 +111,11 @@ impl World for PDF {
     }
 
     fn source(&self, id: FileId) -> FileResult<Source> {
-        let mut map = self.slots.lock();
-        let slot = map.entry(id).or_insert_with(SlotCell::new);
-
-        slot.get_or_init(
-            || self.file(id),
-            |data, prev| {
-                let text = std::str::from_utf8(&data)?;
-
-                if let Some(mut prev) = prev {
-                    prev.replace(text);
-                    Ok(prev)
-                } else {
-                    Ok(Source::new(id, text.into()))
-                }
-            },
-        )
+        self.sources.get(&id).cloned().ok_or_else(|| FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        if let Some(bytes) = self.read.get(id.vpath()) {
-            Ok(bytes.clone())
-        } else {
-            Err(FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
-        }
+        self.files.get(&id).cloned().ok_or_else(|| FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
     }
 
     fn font(&self, index: usize) -> Option<Font> {

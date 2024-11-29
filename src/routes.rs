@@ -20,7 +20,7 @@ pub async fn browse(request: Request<Body>) -> impl IntoResponse {
     static PDF: OnceLock<Arc<Mutex<PDF>>> = OnceLock::new();
     let lock = PDF.get_or_init(|| {
         let mut browse = PDF::main(BROWSE);
-        browse.write("header.typ", HEADER);
+        browse.write_source("header.typ", HEADER);
     
         Arc::new(Mutex::new(browse))
     });
@@ -101,8 +101,8 @@ pub async fn register(Path(suffix): Path<String>, request: Request<Body>) -> imp
     static PDF: OnceLock<Arc<Mutex<PDF>>> = OnceLock::new();
     let lock = PDF.get_or_init(|| {
         let mut register = PDF::main(REGISTER);
-        register.write("header.typ", HEADER);
-        register.write("keyboard.typ", KEYBOARD);
+        register.write_source("header.typ", HEADER);
+        register.write_source("keyboard.typ", KEYBOARD);
     
         Arc::new(Mutex::new(register))
     });
@@ -110,7 +110,7 @@ pub async fn register(Path(suffix): Path<String>, request: Request<Body>) -> imp
     let Ok(mut page) = lock.lock() else {
         return error500().into_response();
     };
-    
+
     let auth = true;
 
     page.write("info.yml", format!("url: \"{URL}\"\nauth: {auth}"));

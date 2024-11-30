@@ -111,26 +111,33 @@ pub async fn register(Path(suffix): Path<String>, request: Request<Body>) -> imp
         return error500().into_response();
     };
 
-    let auth = true;
-
-    page.write("info.yml", format!("url: \"{URL}\"\nauth: {auth}"));
-
-    if suffix.len() == 0 {
+    fn register_empty(page: &mut PDF, request: Request<Body>) -> impl IntoResponse {
         let Ok(buffer) = page.render_with_data("") else {
             return error500().into_response();
         };
     
         return (
             StatusCode::OK,
-            [TYPE_PDF, (SET_COOKIE, &format!("register=; path=/register;"))],
+            [TYPE_PDF, (SET_COOKIE, &format!("field=username; username=; path=/register; password=; path=/register;"))],
             buffer
         ).into_response();
     }
+    
+    let auth = false;
 
     let cookies = CookieJar::from_headers(request.headers());
+    let field = cookies.get("field").map(Cookie::value).unwrap_or("");
+    let username = cookies.get("username").map(Cookie::value).unwrap_or("");
+    let password = cookies.get("password").map(Cookie::value).unwrap_or("");
 
-    let prefix = cookies.get("register").map(Cookie::value).unwrap_or("");
-    let username = format!("{prefix}{suffix}");
+    if suffix.len() == 0 { // Reset to start
+        page.write("info.yml", format!("url: \"{URL}\"\nauth: {auth}\nfield: \"username\""));
+        return register_empty(&mut page, request).into_response();
+    }
+
+    let username = format!("{username}{suffix}");
+
+    page.write("info.yml", format!("url: \"{URL}\"\nauth: {auth}\nfield: \"username\""));
 
     let Ok(buffer) = page.render_with_data(username.as_bytes()) else {
         return error500().into_response();
@@ -138,7 +145,7 @@ pub async fn register(Path(suffix): Path<String>, request: Request<Body>) -> imp
 
     (
         StatusCode::OK,
-        [TYPE_PDF, (SET_COOKIE, &format!("register={username}; path=/register;"))],
+        [TYPE_PDF, (SET_COOKIE, &format!("username={username}; path=/register;"))],
         buffer
     ).into_response()
 }
@@ -158,6 +165,20 @@ pub fn error500() -> impl IntoResponse {
         StatusCode::INTERNAL_SERVER_ERROR,
         [TYPE_PDF],
         Vec::clone(error500)
+    )
+}
+
+pub fn error400() -> impl IntoResponse {
+    static ERROR: OnceLock<Vec<u8>> = OnceLock::new();
+    let error400 = ERROR.get_or_init(|| {
+        error("400", "bad request")
+            .expect("Could not render fallback '400: bad request' page. Aborting program")
+    });
+
+    (
+        StatusCode::BAD_REQUEST,
+        [TYPE_PDF],
+        Vec::clone(error400)
     )
 }
 

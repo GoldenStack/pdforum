@@ -29,11 +29,20 @@
 
 #align(center, {
   align(left, {
-    v(4%)
+
+    let username = info.field == "username";
     
+    v(4%)
+
     text(size: 18pt, fill: luma(80))[
       #h(5.5pt)
-      ALIAS
+      #{
+        if username {
+          "ALIAS"
+        } else {
+          "PASSCODE"
+        }
+      }
     ]
 
     v(-3%)
@@ -41,10 +50,18 @@
     grid(
       inset: 8pt,
       columns: (1fr, auto),
-      button(text(font: "New Computer Modern", size: 24pt, data.clusters().join(sym.zws) + strong[$bracket.b$]), 100%),
-      key(align(center, text(size: 24pt, $arrow.l.hook$)), info.url + "/register/continue")
+      button(text(font: "New Computer Modern", size: 24pt, data.clusters().map(c => if username { c } else { $dot$}).join(sym.zws) + strong[$bracket.b$]), 100%),
+      key(align(center, text(size: 24pt, $arrow.l.hook$)), info.url + "/register/" + {
+        if username {
+          "continue"
+        } else {
+          "confirm"
+        }
+      })
     )
 
     keyboard(info.url + "/register/")
   })
 })
+
+

@@ -13,12 +13,13 @@ readme = "README.md"
 [dependencies]
 anyhow = "1.0.93"
 axum = "0.7.9"
-axum-extra = { version = "0.9.6", features = ["cookie"] }
 chrono = "0.4.38"
 comemo = "0.4.0"
 ecow = "0.2.3"
 parking_lot = "0.12.3"
+serde = "1.0.215"
 tokio = { version = "1.41.1", features = ["full"] }
+tower-sessions = "0.13.0"
 typst = "0.12.0"
 typst-assets = "0.12.0"
 typst-cli = "0.12.0"

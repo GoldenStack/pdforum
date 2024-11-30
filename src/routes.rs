@@ -1,8 +1,10 @@
-use std::{sync::{Arc, Mutex, OnceLock}, time::Instant};
+use std::{fmt::Display, sync::{Arc, OnceLock}, time::Instant};
 
-use axum::{body::Body, extract::Path, http::{header::{CONTENT_TYPE, SET_COOKIE}, HeaderName, Request, StatusCode}, response::IntoResponse};
-use axum_extra::extract::{cookie::Cookie, CookieJar};
+use axum::{body::Body, extract::Path, http::{header::CONTENT_TYPE, HeaderName, Request, Response, StatusCode}, response::IntoResponse};
 use ecow::EcoVec;
+use parking_lot::Mutex;
+use serde::{Deserialize, Serialize};
+use tower_sessions::Session;
 use typst::diag::SourceDiagnostic;
 
 use crate::URL;
@@ -15,6 +17,31 @@ const KEYBOARD: &str = include_str!("../templates/keyboard.typ");
 const REGISTER: &str = include_str!("../templates/register.typ");
 
 const TYPE_PDF: (HeaderName, &str) = (CONTENT_TYPE, "application/pdf");
+
+const REGISTRATION: &str = "register";
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct Register {
+    field: RegisterField,
+    username: String,
+    password: String,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+enum RegisterField {
+    #[default]
+    Username,
+    Password
+}
+
+impl Display for RegisterField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Username => write!(f, "username"),
+            Self::Password => write!(f, "password"),
+        }
+    }
+}
 
 pub async fn browse(request: Request<Body>) -> impl IntoResponse {
     static PDF: OnceLock<Arc<Mutex<PDF>>> = OnceLock::new();
@@ -80,24 +107,14 @@ This is a post! There is text here that is rendering on your screen right now. I
 
     let auth = false;
 
-    let Ok(mut page) = lock.lock() else {
-        return error500().into_response();
-    };
+    let mut page = lock.lock();
 
     page.write("info.yml", format!("url: \"{URL}\"\nauth: {auth}"));
 
-    let Ok(buffer) = page.render_with_data(data) else {
-        return error500().into_response();
-    };
-
-    (
-        StatusCode::OK,
-        [TYPE_PDF],
-        buffer
-    ).into_response()
+    render_into(&mut page, data)
 }
 
-pub async fn register(Path(suffix): Path<String>, request: Request<Body>) -> impl IntoResponse {
+pub async fn register(session: Session, Path(suffix): Path<String>, request: Request<Body>) -> impl IntoResponse {
     static PDF: OnceLock<Arc<Mutex<PDF>>> = OnceLock::new();
     let lock = PDF.get_or_init(|| {
         let mut register = PDF::main(REGISTER);
@@ -107,51 +124,43 @@ pub async fn register(Path(suffix): Path<String>, request: Request<Body>) -> imp
         Arc::new(Mutex::new(register))
     });
 
-    let Ok(mut page) = lock.lock() else {
+    let Ok(mut register) = session.get::<Register>(REGISTRATION).await.map(Option::unwrap_or_default) else {
         return error500().into_response();
     };
 
-    fn register_empty(page: &mut PDF, request: Request<Body>) -> impl IntoResponse {
-        let Ok(buffer) = page.render_with_data("") else {
-            return error500().into_response();
-        };
-    
-        return (
-            StatusCode::OK,
-            [TYPE_PDF, (SET_COOKIE, &format!("field=username; username=; path=/register; password=; path=/register;"))],
-            buffer
-        ).into_response();
-    }
-    
     let auth = false;
 
-    let cookies = CookieJar::from_headers(request.headers());
-    let field = cookies.get("field").map(Cookie::value).unwrap_or("");
-    let username = cookies.get("username").map(Cookie::value).unwrap_or("");
-    let password = cookies.get("password").map(Cookie::value).unwrap_or("");
-
-    if suffix.len() == 0 { // Reset to start
-        page.write("info.yml", format!("url: \"{URL}\"\nauth: {auth}\nfield: \"username\""));
-        return register_empty(&mut page, request).into_response();
+    match suffix.as_str() {
+        "" => register = Register::default(),
+        "next" => {
+            match register.field {
+                RegisterField::Username => register.field = RegisterField::Password,
+                RegisterField::Password => todo!("TODO register for username {} password {}", register.username, register.password),
+            }   
+        }
+        c if c.len() == 1 => {
+            match register.field {
+                RegisterField::Username => register.username = format!("{}{}", register.username, c),
+                RegisterField::Password => register.password = format!("{}{}", register.password, c),
+            }
+        }
+        _ => return error400().into_response(),
     }
 
-    let username = format!("{username}{suffix}");
+    session.insert(REGISTRATION, &register).await.unwrap();
 
-    page.write("info.yml", format!("url: \"{URL}\"\nauth: {auth}\nfield: \"username\""));
+    let mut page = lock.lock();
 
-    let Ok(buffer) = page.render_with_data(username.as_bytes()) else {
-        return error500().into_response();
-    };
+    page.write("info.yml", format!("url: \"{URL}\"\nauth: {auth}\nfield: \"{}\"", register.field));
 
-    (
-        StatusCode::OK,
-        [TYPE_PDF, (SET_COOKIE, &format!("username={username}; path=/register;"))],
-        buffer
-    ).into_response()
+    match register.field {
+        RegisterField::Username => render_into(&mut page, register.username),
+        RegisterField::Password => render_into(&mut page, register.password),
+    }
 }
 
-pub async fn register_empty(request: Request<Body>) -> impl IntoResponse {
-    register(Path(String::new()), request).await.into_response()
+pub async fn register_empty(session: Session, request: Request<Body>) -> impl IntoResponse {
+    register(session, Path(String::new()), request).await.into_response()
 }
 
 pub fn error500() -> impl IntoResponse {
@@ -195,4 +204,15 @@ pub fn error404() -> (StatusCode, [(HeaderName, &'static str); 1], Vec<u8>) {
 
 pub fn error(code: &str, message: &str) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
     PDF::main(ERROR).render_with_data(format!("{code}\n{message}"))
+}
+
+pub fn render_into<I: Into<Vec<u8>>>(pdf: &mut PDF, data: I) -> Response<Body> {
+    match pdf.render_with_data(data) {
+        Ok(buffer) => (
+            StatusCode::OK,
+            [TYPE_PDF],
+            buffer
+        ).into_response(),
+        Err(_) => error500().into_response()
+    }
 }

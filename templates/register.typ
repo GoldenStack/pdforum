@@ -51,17 +51,9 @@
       inset: 8pt,
       columns: (1fr, auto),
       button(text(font: "New Computer Modern", size: 24pt, data.clusters().map(c => if username { c } else { $dot$}).join(sym.zws) + strong[$bracket.b$]), 100%),
-      key(align(center, text(size: 24pt, $arrow.l.hook$)), info.url + "/register/" + {
-        if username {
-          "continue"
-        } else {
-          "confirm"
-        }
-      })
+      key(align(center, text(size: 24pt, $arrow.l.hook$)), info.url + "/register/next")
     )
 
     keyboard(info.url + "/register/")
   })
 })
-
-

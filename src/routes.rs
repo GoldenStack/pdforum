@@ -1,8 +1,8 @@
-use std::{fmt::Display, sync::{Arc, OnceLock}, time::Instant};
+use std::{sync::{Arc, OnceLock}, time::Instant};
 
 use axum::{body::Body, extract::Path, http::{header::CONTENT_TYPE, HeaderName, Request, Response, StatusCode}, response::IntoResponse};
 use ecow::EcoVec;
-use parking_lot::Mutex;
+use parking_lot::{lock_api::MutexGuard, Mutex};
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use typst::diag::SourceDiagnostic;
@@ -10,13 +10,56 @@ use typst::diag::SourceDiagnostic;
 use crate::URL;
 use crate::render::PDF;
 
-const ERROR: &str = include_str!("../templates/error.typ");
-const BROWSE: &str = include_str!("../templates/browse.typ");
-const HEADER: &str = include_str!("../templates/header.typ");
-const KEYBOARD: &str = include_str!("../templates/keyboard.typ");
-const REGISTER: &str = include_str!("../templates/register.typ");
+const ERROR_STR: &str = include_str!("../templates/error.typ");
+const BROWSE_STR: &str = include_str!("../templates/browse.typ");
+const HEADER_STR: &str = include_str!("../templates/header.typ");
+const KEYBOARD_STR: &str = include_str!("../templates/keyboard.typ");
+const REGISTER_STR: &str = include_str!("../templates/register.typ");
 
 const TYPE_PDF: (HeaderName, &str) = (CONTENT_TYPE, "application/pdf");
+
+/// A static PDF, stored with an initializer function.
+/// 
+/// This is a simple wrapper over a OnceLock that moves initialization
+/// and locking to a central location.
+pub struct Page {
+    lock: OnceLock<Arc<Mutex<PDF>>>,
+    function: fn() -> PDF,
+}
+
+impl Page {
+    pub const fn new(function: fn() -> PDF) -> Self {
+        Page {
+            lock: OnceLock::new(),
+            function,
+        }
+    }
+
+    /// Initializes the page PDF if it has not been initialized yet,
+    /// and then blocks to acquire the mutex.
+    pub fn lock(&self) -> MutexGuard<'_, parking_lot::RawMutex, PDF> {
+        self.lock.get_or_init(|| {
+            let pdf = (self.function)();
+
+            Arc::new(Mutex::new(pdf))
+        }).lock()
+    }
+}
+
+static BROWSE: Page = Page::new(|| {
+    let mut pdf = PDF::main(BROWSE_STR);
+    pdf.write_source("header.typ", HEADER_STR);
+    pdf
+});
+
+static REGISTER: Page = Page::new(|| {
+    let mut pdf = PDF::main(REGISTER_STR);
+    pdf.write_source("header.typ", HEADER_STR);
+    pdf.write_source("keyboard.typ", KEYBOARD_STR);
+
+    pdf
+});
+
 
 const REGISTRATION: &str = "register";
 
@@ -34,24 +77,7 @@ enum RegisterField {
     Password
 }
 
-impl Display for RegisterField {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Username => write!(f, "username"),
-            Self::Password => write!(f, "password"),
-        }
-    }
-}
-
 pub async fn browse(request: Request<Body>) -> impl IntoResponse {
-    static PDF: OnceLock<Arc<Mutex<PDF>>> = OnceLock::new();
-    let lock = PDF.get_or_init(|| {
-        let mut browse = PDF::main(BROWSE);
-        browse.write_source("header.typ", HEADER);
-    
-        Arc::new(Mutex::new(browse))
-    });
-
     let data = r#"
 AUTHOR HERE
 1
@@ -107,7 +133,7 @@ This is a post! There is text here that is rendering on your screen right now. I
 
     let auth = false;
 
-    let mut page = lock.lock();
+    let mut page = BROWSE.lock();
 
     page.write("info.yml", format!("url: \"{URL}\"\nauth: {auth}"));
 
@@ -115,15 +141,6 @@ This is a post! There is text here that is rendering on your screen right now. I
 }
 
 pub async fn register(session: Session, Path(suffix): Path<String>, request: Request<Body>) -> impl IntoResponse {
-    static PDF: OnceLock<Arc<Mutex<PDF>>> = OnceLock::new();
-    let lock = PDF.get_or_init(|| {
-        let mut register = PDF::main(REGISTER);
-        register.write_source("header.typ", HEADER);
-        register.write_source("keyboard.typ", KEYBOARD);
-    
-        Arc::new(Mutex::new(register))
-    });
-
     let Ok(mut register) = session.get::<Register>(REGISTRATION).await.map(Option::unwrap_or_default) else {
         return error500().into_response();
     };
@@ -149,14 +166,16 @@ pub async fn register(session: Session, Path(suffix): Path<String>, request: Req
 
     session.insert(REGISTRATION, &register).await.unwrap();
 
-    let mut page = lock.lock();
+    let value = match register.field {
+        RegisterField::Username => ("username", register.username),
+        RegisterField::Password => ("password", register.password),
+    };
 
-    page.write("info.yml", format!("url: \"{URL}\"\nauth: {auth}\nfield: \"{}\"", register.field));
+    let mut page = REGISTER.lock();
 
-    match register.field {
-        RegisterField::Username => render_into(&mut page, register.username),
-        RegisterField::Password => render_into(&mut page, register.password),
-    }
+    page.write("info.yml", format!("url: \"{URL}\"\nauth: {auth}\nfield: \"{}\"", value.0));
+
+    render_into(&mut page, value.1)
 }
 
 pub async fn register_empty(session: Session, request: Request<Body>) -> impl IntoResponse {
@@ -203,7 +222,7 @@ pub fn error404() -> (StatusCode, [(HeaderName, &'static str); 1], Vec<u8>) {
 }
 
 pub fn error(code: &str, message: &str) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
-    PDF::main(ERROR).render_with_data(format!("{code}\n{message}"))
+    PDF::main(ERROR_STR).render_with_data(format!("{code}\n{message}"))
 }
 
 pub fn render_into<I: Into<Vec<u8>>>(pdf: &mut PDF, data: I) -> Response<Body> {

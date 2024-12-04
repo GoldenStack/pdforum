@@ -1,13 +1,14 @@
 use std::{sync::{Arc, OnceLock}, time::Instant};
 
-use axum::{body::Body, extract::Path, http::{header::CONTENT_TYPE, HeaderName, Request, Response, StatusCode}, response::IntoResponse};
+use axum::{body::Body, extract::Path, http::{header::CONTENT_TYPE, HeaderName, Request, Response, StatusCode}, response::{IntoResponse, Redirect}, Extension};
 use ecow::EcoVec;
 use parking_lot::{lock_api::MutexGuard, Mutex};
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use tower_sessions::Session;
 use typst::diag::SourceDiagnostic;
 
-use crate::URL;
+use crate::{database, URL};
 use crate::render::PDF;
 
 const ERROR_STR: &str = include_str!("../templates/error.typ");
@@ -77,7 +78,14 @@ enum RegisterField {
     Password
 }
 
-pub async fn browse(request: Request<Body>) -> impl IntoResponse {
+const AUTH: &str = "auth";
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct Auth {
+    username: String,
+}
+
+pub async fn browse(session: Session, request: Request<Body>) -> impl IntoResponse {
     let data = r#"
 AUTHOR HERE
 1
@@ -131,7 +139,7 @@ This is a post! There is text here that is rendering on your screen right now. I
     
     let data = format!("{data}{:?}", Instant::now());
 
-    let auth = false;
+    let auth = session.get::<Auth>(AUTH).await.ok().flatten().is_some();
 
     let mut page = BROWSE.lock();
 
@@ -140,20 +148,32 @@ This is a post! There is text here that is rendering on your screen right now. I
     render_into(&mut page, data)
 }
 
-pub async fn register(session: Session, Path(suffix): Path<String>, request: Request<Body>) -> impl IntoResponse {
+pub async fn register(pg: Extension<Arc<PgPool>>, session: Session, Path(suffix): Path<String>, request: Request<Body>) -> impl IntoResponse {
     let Ok(mut register) = session.get::<Register>(REGISTRATION).await.map(Option::unwrap_or_default) else {
         return error500().into_response();
     };
-
-    let auth = false;
 
     match suffix.as_str() {
         "" => register = Register::default(),
         "next" => {
             match register.field {
                 RegisterField::Username => register.field = RegisterField::Password,
-                RegisterField::Password => todo!("TODO register for username {} password {}", register.username, register.password),
-            }   
+                RegisterField::Password => {
+                    match database::register(&pg, &register.username, &register.password).await {
+                        Ok(true) => {
+                            let Ok(register) = session.remove::<Register>(REGISTRATION).await.map(Option::unwrap_or_default) else {
+                                return error500().into_response();
+                            };
+                        
+                            session.insert(AUTH, Auth { username: register.username }).await.unwrap();
+                            return Redirect::temporary("/").into_response();
+                        }
+                        Ok(false) | Err(_) => {
+                            todo!()
+                        }
+                    }
+                },
+            }
         }
         c if c.len() == 1 => {
             match register.field {
@@ -165,6 +185,8 @@ pub async fn register(session: Session, Path(suffix): Path<String>, request: Req
     }
 
     session.insert(REGISTRATION, &register).await.unwrap();
+
+    let auth = session.get::<Auth>(AUTH).await.ok().flatten().is_some();
 
     let value = match register.field {
         RegisterField::Username => ("username", register.username),
@@ -178,8 +200,8 @@ pub async fn register(session: Session, Path(suffix): Path<String>, request: Req
     render_into(&mut page, value.1)
 }
 
-pub async fn register_empty(session: Session, request: Request<Body>) -> impl IntoResponse {
-    register(session, Path(String::new()), request).await.into_response()
+pub async fn register_empty(postgres: Extension<Arc<PgPool>>, session: Session, request: Request<Body>) -> impl IntoResponse {
+    register(postgres, session, Path(String::new()), request).await.into_response()
 }
 
 pub fn error500() -> impl IntoResponse {

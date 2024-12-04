@@ -17,8 +17,11 @@ chrono = "0.4.38"
 comemo = "0.4.0"
 ecow = "0.2.3"
 parking_lot = "0.12.3"
+rand = "0.8.5"
 serde = "1.0.215"
-tokio = { version = "1.41.1", features = ["full"] }
+sha2 = "0.10.8"
+sqlx = { version = "0.8.2", features = ["runtime-tokio", "postgres", "time"] }
+tokio = { version = "1.41.1", features = ["rt-multi-thread"] }
 tower-sessions = "0.13.0"
 typst = "0.12.0"
 typst-assets = "0.12.0"

@@ -22,12 +22,12 @@ pub async fn register(pg: &PgPool, username: &str, password: &str) -> Result<boo
     
     // Filter for "duplicate key value violates unique constraint"
     // (here, it means the user already exists)
-    let user_exists = err.as_database_error()
+    let user_already_exists = err.as_database_error()
         .and_then(DatabaseError::code)
         .filter(|code| code == "23505")
         .is_some();
 
-    if user_exists {
+    if user_already_exists {
         Ok(false)
     } else {
         Err(err)

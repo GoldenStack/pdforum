@@ -5,7 +5,7 @@ pub mod database;
 use std::{env, sync::Arc};
 
 use anyhow::Result;
-use axum::{response::Redirect, routing::get, Extension, Router};
+use axum::{routing::get, Extension, Router};
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use tower_sessions::{cookie::{time::Duration, SameSite}, Expiry, MemoryStore, SessionManagerLayer};
 
@@ -44,7 +44,6 @@ async fn main() -> Result<()> {
         .route("/", get(routes::browse))
         .route("/register/:username", get(routes::register))
         .route("/register", get(routes::register_empty))
-        .route("/register/", get(Redirect::permanent("/register")))
         .fallback(get(routes::error404()))
         .layer(session_layer)
         .layer(postgres_layer);

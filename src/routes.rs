@@ -4,11 +4,10 @@ use axum::{body::Body, extract::Path, http::{header::CONTENT_TYPE, HeaderName, R
 use ecow::EcoVec;
 use parking_lot::{lock_api::MutexGuard, Mutex};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
 use tower_sessions::Session;
 use typst::diag::SourceDiagnostic;
 
-use crate::{database, URL};
+use crate::{database, Context};
 use crate::render::PDF;
 
 const ERROR_STR: &str = include_str!("../templates/error.typ");
@@ -85,7 +84,7 @@ struct Auth {
     username: String,
 }
 
-pub async fn browse(session: Session, request: Request<Body>) -> impl IntoResponse {
+pub async fn browse(ctx: Extension<Context>, session: Session, request: Request<Body>) -> impl IntoResponse {
     let data = r#"
 AUTHOR HERE
 1
@@ -143,12 +142,12 @@ This is a post! There is text here that is rendering on your screen right now. I
 
     let mut page = BROWSE.lock();
 
-    page.write("info.yml", format!("url: \"{URL}\"\nauth: {auth}"));
+    page.write("info.yml", format!("url: \"{}\"\nauth: {auth}", ctx.base_url));
 
     render_into(&mut page, data)
 }
 
-pub async fn register(pg: Extension<Arc<PgPool>>, session: Session, Path(suffix): Path<String>, request: Request<Body>) -> impl IntoResponse {
+pub async fn register(ctx: Extension<Context>, session: Session, Path(suffix): Path<String>, request: Request<Body>) -> impl IntoResponse {
     let Ok(mut register) = session.get::<Register>(REGISTRATION).await.map(Option::unwrap_or_default) else {
         return error500().into_response();
     };
@@ -159,7 +158,7 @@ pub async fn register(pg: Extension<Arc<PgPool>>, session: Session, Path(suffix)
             match register.field {
                 RegisterField::Username => register.field = RegisterField::Password,
                 RegisterField::Password => {
-                    match database::register(&pg, &register.username, &register.password).await {
+                    match database::register(&ctx.db, &register.username, &register.password).await {
                         Ok(true) => {
                             let Ok(register) = session.remove::<Register>(REGISTRATION).await.map(Option::unwrap_or_default) else {
                                 return error500().into_response();
@@ -195,12 +194,12 @@ pub async fn register(pg: Extension<Arc<PgPool>>, session: Session, Path(suffix)
 
     let mut page = REGISTER.lock();
 
-    page.write("info.yml", format!("url: \"{URL}\"\nauth: {auth}\nfield: \"{}\"", value.0));
+    page.write("info.yml", format!("url: \"{}\"\nauth: {auth}\nfield: \"{}\"", ctx.base_url, value.0));
 
     render_into(&mut page, value.1)
 }
 
-pub async fn register_empty(postgres: Extension<Arc<PgPool>>, session: Session, request: Request<Body>) -> impl IntoResponse {
+pub async fn register_empty(postgres: Extension<Context>, session: Session, request: Request<Body>) -> impl IntoResponse {
     register(postgres, session, Path(String::new()), request).await.into_response()
 }
 

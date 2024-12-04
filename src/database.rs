@@ -1,24 +1,18 @@
-use std::sync::Arc;
-
-use axum::Extension;
 use rand::{rngs::OsRng, RngCore};
 use sha2::{Digest, Sha256};
 use sqlx::{error::DatabaseError, PgPool};
 
-// The type provided to Axum (makes calling functions here more convenient).
-type AxumPgPool = Extension<Arc<PgPool>>;
-
 /// Attempts to register the provided user with the given password. Returns
 /// `Ok(true)` if the user was registered, `Ok(false)` if a user with the given
 /// username already existed, and `Err` if a miscellaneous SQL error occurred.
-pub async fn register(pg: &AxumPgPool, username: &str, password: &str) -> Result<bool, sqlx::Error> {
+pub async fn register(pg: &PgPool, username: &str, password: &str) -> Result<bool, sqlx::Error> {
     let (password, salt) = hash(password);
 
     let result = sqlx::query!(
             "INSERT INTO users (username, password, salt) VALUES ($1, $2, $3)",
             username, &password, &salt
         )
-        .execute(&***pg)
+        .execute(pg)
         .await;
 
     // User registered, good!

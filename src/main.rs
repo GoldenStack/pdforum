@@ -2,24 +2,37 @@ pub mod render;
 pub mod routes;
 pub mod database;
 
-use std::sync::Arc;
+use std::{env, sync::Arc};
 
 use anyhow::Result;
 use axum::{response::Redirect, routing::get, Extension, Router};
-use sqlx::postgres::PgPoolOptions;
+use sqlx::{postgres::PgPoolOptions, PgPool};
 use tower_sessions::{cookie::{time::Duration, SameSite}, Expiry, MemoryStore, SessionManagerLayer};
 
-pub const URL: &str = "http://localhost:1473";
+#[derive(Clone, Debug)]
+pub struct Context {
+    pub base_url: Arc<String>,
+    pub db: PgPool,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    dotenvy::dotenv()?;
+
+    let base_url = env::var("BASE_URL")?;
+    let database_url = env::var("DATABASE_URL")?;
 
     let db = PgPoolOptions::new()
         .max_connections(16)
-        .connect(&"REDACTED") // NOT leaking this sorry
+        .connect(&database_url)
         .await?;
 
-    let postgres_layer = Extension(Arc::new(db));
+    let ctx = Context {
+        base_url: Arc::new(base_url),
+        db
+    };
+
+    let postgres_layer = Extension(ctx);
 
     let session_store = MemoryStore::default();
     let session_layer = SessionManagerLayer::new(session_store)

@@ -5,7 +5,7 @@
 
 #show: common.with(info)
 
-#let data = "ok bozo lmfaoooo.... "//read("data.txt")
+#let data = read("data.txt")
 
 #{
     let username = info.field == "username";

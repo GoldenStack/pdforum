@@ -27,7 +27,5 @@ sqlx = { version = "0.8.2", features = ["runtime-tokio", "postgres", "time"] }
 tokio = { version = "1.41.1", features = ["rt-multi-thread"] }
 tower-sessions = "0.13.0"
 typst = "0.12.0"
-typst-assets = "0.12.0"
-typst-cli = "0.12.0"
 typst-kit = "0.12.0"
 typst-pdf = "0.12.0"

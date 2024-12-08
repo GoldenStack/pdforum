@@ -1,6 +1,23 @@
+use std::env;
+
+use anyhow::Result;
 use rand::{rngs::OsRng, RngCore};
 use sha2::{Digest, Sha256};
-use sqlx::{error::DatabaseError, PgPool};
+use sqlx::{error::DatabaseError, postgres::PgPoolOptions, PgPool};
+
+/// Opens a connection to the Postgres database.
+/// This uses the Postgres connection string defined in the `DATABASE_URL`
+/// environment variable.
+pub async fn open_connection() -> Result<PgPool> {
+    let database_url = env::var("DATABASE_URL")?;
+
+    let db = PgPoolOptions::new()
+        .max_connections(16)
+        .connect(&database_url)
+        .await?;
+
+    Ok(db)
+}
 
 /// Attempts to register the provided user with the given password. Returns
 /// `Ok(true)` if the user was registered, `Ok(false)` if a user with the given

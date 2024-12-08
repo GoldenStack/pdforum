@@ -6,7 +6,7 @@ use std::{env, sync::Arc};
 
 use anyhow::Result;
 use axum::{routing::get, Extension, Router};
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::PgPool;
 use tower_sessions::{
     cookie::{time::Duration, SameSite},
     Expiry, MemoryStore, SessionManagerLayer,
@@ -23,16 +23,10 @@ async fn main() -> Result<()> {
     dotenvy::dotenv()?;
 
     let base_url = env::var("BASE_URL")?;
-    let database_url = env::var("DATABASE_URL")?;
-
-    let db = PgPoolOptions::new()
-        .max_connections(16)
-        .connect(&database_url)
-        .await?;
 
     let ctx = Context {
         base_url: Arc::new(base_url),
-        db,
+        db: database::open_connection().await?,
     };
 
     let postgres_layer = Extension(ctx);

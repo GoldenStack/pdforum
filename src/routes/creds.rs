@@ -89,8 +89,6 @@ pub async fn register(
         return error500().into_response();
     };
 
-    println!("{:?}, {}", register, suffix);
-
     if suffix == "next" {
         if !register.next() {
             match database::register(&ctx.db, &register.username, &register.password).await {

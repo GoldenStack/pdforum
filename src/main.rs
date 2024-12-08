@@ -41,9 +41,11 @@ async fn main() -> Result<()> {
         .with_expiry(Expiry::OnInactivity(Duration::hours(6)));
 
     let app = Router::new()
-        .route("/", get(routes::browse))
-        .route("/register/:username", get(routes::register))
-        .route("/register", get(routes::register_empty))
+        .route("/", get(routes::browse::browse))
+        .route("/register/:username", get(routes::creds::register))
+        .route("/register", get(routes::creds::register_empty))
+        .route("/login/:username", get(routes::creds::login))
+        .route("/login", get(routes::creds::login_empty))
         .fallback(get(routes::error404()))
         .layer(session_layer)
         .layer(postgres_layer);

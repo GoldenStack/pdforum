@@ -35,6 +35,24 @@ pub async fn register(pg: &PgPool, username: &str, password: &str) -> Result<boo
     
 }
 
+/// Checks whether or not the provided password is valid for the given username.
+/// If the user exists, returns whether or not the provided password is valid.
+/// If there is an SQL error (including the user not existing), `Err` is
+/// returned. 
+pub async fn login(pg: &PgPool, username: &str, password: &str) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query!(
+            "SELECT password, salt FROM users WHERE username = $1",
+            username
+        )
+        .fetch_one(pg)
+        .await?;
+
+    let salt = result.salt.as_slice();
+    let correct_hash = result.password.as_slice();
+
+    Ok(hash_salt(password, salt) == correct_hash) 
+}
+
 /// Hashes the provided password, generating a salt, hashing the password with
 /// it, and then returning both.
 /// 
@@ -44,7 +62,7 @@ pub fn hash(password: &str) -> ([u8; 32], [u8; 8]) {
 
     OsRng.fill_bytes(&mut salt);
 
-    let hash = hash_salt(password, salt);
+    let hash = hash_salt(password, &salt);
 
     (hash, salt)
 }
@@ -56,7 +74,7 @@ pub fn hash(password: &str) -> ([u8; 32], [u8; 8]) {
 /// secure. Sorry!
 /// 
 /// [Argon2id]: https://en.wikipedia.org/wiki/Argon2
-pub fn hash_salt(password: &str, salt: [u8; 8]) -> [u8; 32] {
+pub fn hash_salt(password: &str, salt: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
 
     hasher.update(password);

@@ -50,10 +50,10 @@
     grid(
       inset: 8pt,
       columns: (1fr, auto),
-      button(text(font: "New Computer Modern", size: 24pt, data.clusters().map(c => if username { c } else { $dot$}).join(sym.zws) + strong[$bracket.b$]), 100%),
-      key(align(center, text(size: 24pt, $arrow.l.hook$)), info.url + "/register/next")
+      button(text(font: "New Computer Modern", size: 24pt, data.clusters().map(c => if username { c } else { $dot$ }).join(sym.zws) + strong[$bracket.b$]), 100%),
+      key(align(center, text(size: 24pt, $arrow.l.hook$)), info.url + info.path + "next")
     )
 
-    keyboard(info.url + "/register/")
+    keyboard(info.url + info.path)
   })
 })

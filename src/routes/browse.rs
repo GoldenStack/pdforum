@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use axum::{body::Body, http::Request, response::IntoResponse, Extension};
+use axum::{response::IntoResponse, Extension};
 use tower_sessions::Session;
 
 use crate::{render::PDF, Context};
@@ -16,7 +16,7 @@ static BROWSE: Page = Page::new(|| {
 });
 
 
-pub async fn browse(ctx: Extension<Context>, session: Session, request: Request<Body>) -> impl IntoResponse {
+pub async fn browse(ctx: Extension<Context>, session: Session) -> impl IntoResponse {
     let data = r#"
 AUTHOR HERE
 1

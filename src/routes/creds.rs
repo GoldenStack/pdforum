@@ -1,6 +1,6 @@
 use std::fmt::{self, Display};
 
-use axum::{body::Body, extract::Path, http::Request, response::{IntoResponse, Redirect}, Extension};
+use axum::{extract::Path, response::{IntoResponse, Redirect}, Extension};
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 
@@ -70,7 +70,7 @@ impl Display for CredentialsField {
     }
 }
 
-pub async fn register(ctx: Extension<Context>, session: Session, Path(suffix): Path<String>, request: Request<Body>) -> impl IntoResponse {
+pub async fn register(ctx: Extension<Context>, session: Session, Path(suffix): Path<String>) -> impl IntoResponse {
     let Ok(mut register) = session.get::<Credentials>(REGISTRATION).await.map(Option::unwrap_or_default) else {
         return error500().into_response();
     };
@@ -115,11 +115,11 @@ field: {}"#, ctx.base_url, register.field);
     render_into(&mut page, register.into_field())
 }
 
-pub async fn register_empty(ctx: Extension<Context>, session: Session, request: Request<Body>) -> impl IntoResponse {
-    register(ctx, session, Path(String::new()), request).await
+pub async fn register_empty(ctx: Extension<Context>, session: Session) -> impl IntoResponse {
+    register(ctx, session, Path(String::new())).await
 }
 
-pub async fn login(ctx: Extension<Context>, session: Session, Path(suffix): Path<String>, request: Request<Body>) -> impl IntoResponse {
+pub async fn login(ctx: Extension<Context>, session: Session, Path(suffix): Path<String>) -> impl IntoResponse {
     let Ok(mut register) = session.get::<Credentials>(LOGIN).await.map(Option::unwrap_or_default) else {
         return error500().into_response();
     };
@@ -162,6 +162,6 @@ field: {}"#, ctx.base_url, register.field);
     render_into(&mut page, register.into_field())
 }
 
-pub async fn login_empty(ctx: Extension<Context>, session: Session, request: Request<Body>) -> impl IntoResponse {
-    login(ctx, session, Path(String::new()), request).await
+pub async fn login_empty(ctx: Extension<Context>, session: Session) -> impl IntoResponse {
+    login(ctx, session, Path(String::new())).await
 }

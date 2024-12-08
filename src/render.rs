@@ -23,6 +23,13 @@ use typst_kit::fonts::{FontSlot, Fonts};
 use anyhow::Result;
 use typst_pdf::{PdfOptions, PdfStandards};
 
+/// A PDF to be rendered with PDForum.
+/// 
+/// This is a Typst [World], except it implements a fake filesystem which is
+/// internally just an in-memory [HashMap]. This simplifies the overall
+/// workflow, makes the entire rendering process faster, and prevents, in the
+/// worst case (i.e. Typst injection, which, now that I'm writing it, sounds
+/// very funny), arbitrary filesystem reads.
 pub struct PDF {
     /// The input path.
     main: FileId,
@@ -34,9 +41,9 @@ pub struct PDF {
     fonts: Vec<FontSlot>,
     /// The current datetime if requested.
     now: DateTime<Utc>,
-    /// Fake isolated filesystem
+    /// Fake isolated filesystem.
     files: HashMap<FileId, Bytes>,
-    /// Fake isolated filesystem but exclusively storing source files
+    /// Fake isolated filesystem but exclusively storing source files.
     sources: HashMap<FileId, Source>,
 }
 
@@ -55,6 +62,9 @@ impl PDF {
         pdf
     }
 
+    /// Creates a new PDF.
+    /// This won't really do much; remember to [PDF::write] / [PDF::write_source]
+    /// files to this 'filesystem'.
     pub fn new<M: Into<PathBuf>>(main: M) -> Self {
         let path = main.into();
         let root: PathBuf = path.parent().unwrap_or(Path::new(".")).into();
@@ -76,6 +86,8 @@ impl PDF {
         }
     }
 
+    /// Writes a binary file to this filesystem.
+    /// Binary files may or may not be valid UTF-8.
     pub fn write<M: Into<PathBuf>, I: Into<Vec<u8>>>(&mut self, path: M, data: I) {
         let vpath = VirtualPath::new(path.into());
 
@@ -84,6 +96,12 @@ impl PDF {
         self.files.insert(id, data.into().into());
     }
 
+    /// Writes a source file to this filesystem. It must be valid UTF-8.
+    /// This will allow it to be treated both as a source file and a binary
+    /// file, but only source files can be actually loaded.
+    /// 
+    /// Generally, source files will be written to once when creating the PDF,
+    /// while non-source files will be written to before each render.
     pub fn write_source<M: Into<PathBuf>, I: Into<String>>(&mut self, path: M, data: I) {
         let vpath = VirtualPath::new(path.into());
 
@@ -95,6 +113,8 @@ impl PDF {
         self.sources.insert(id, Source::new(id, data));
     }
 
+    /// Renders this PDF into bytes representing the actual PDF.
+    /// This will [compile] it and then [export](typst_pdf::pdf) it.
     pub fn render(&mut self) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
         let document = compile(self).output?;
 
@@ -108,6 +128,10 @@ impl PDF {
         typst_pdf::pdf(&document, &options)
     }
 
+    /// Renders this PDF into bytes representing the actual PDF.
+    /// Additionally, this will write the given data to the `data.txt` path,
+    /// which (in PDForum, at least) is the standardized location of data,
+    /// primarily unsanitized user input data.
     pub fn render_with_data<I: Into<Vec<u8>>>(
         &mut self,
         data: I,

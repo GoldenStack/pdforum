@@ -75,3 +75,28 @@
   row(url, chars: "asdfghjkl".codepoints(), left-pad: 0.25fr, right-pad: 0.25fr)
   row(url, chars: "zxcvbnm".codepoints(), left-pad: 0.5fr, right-pad: 0.75fr)
 }
+
+#let input_and_keyboard(title, input, base-url) = {
+  align(center, {
+    align(left, {        
+      v(4%)
+  
+      text(size: 18pt, fill: luma(80))[
+        #h(5.5pt)
+        #title
+      ]
+  
+      v(-3%)
+  
+      grid(
+        inset: 8pt,
+        columns: (1fr, auto),
+        button(text(font: "New Computer Modern", size: 24pt, input + strong[$bracket.b$]), 100%),
+        align(horizon, box(key(align(center, text(size: 24pt, $arrow.l.hook$)), base-url + "next")))
+      )
+  
+      keyboard(base-url)
+    })
+  })
+
+}

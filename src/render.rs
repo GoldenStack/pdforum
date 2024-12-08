@@ -38,9 +38,17 @@ pub struct PDF {
 }
 
 impl PDF {
-    pub fn main<I: Into<String>>(data: I) -> Self {
-        let mut pdf = Self::new("main.typ");
-        pdf.write_source("main.typ", data);
+    /// Makes a PDF from the given main path and list of sources.
+    /// This is intended to allow creating a PDF with a single expression.
+    pub fn make<const C: usize, M: Into<PathBuf>, I: Into<String>>(
+        main: M,
+        items: [(M, I); C],
+    ) -> Self {
+        let mut pdf = PDF::new(main);
+        for (path, data) in items {
+            pdf.write_source(path, data);
+        }
+
         pdf
     }
 

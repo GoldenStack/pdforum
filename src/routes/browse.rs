@@ -10,9 +10,10 @@ use super::{render_into, Auth, Page, AUTH, HEADER_STR};
 const BROWSE_STR: &str = include_str!("../../templates/browse.typ");
 
 static BROWSE: Page = Page::new(|| {
-    let mut pdf = PDF::main(BROWSE_STR);
-    pdf.write_source("header.typ", HEADER_STR);
-    pdf
+    PDF::make(
+        "browse.typ",
+        [("browse.typ", BROWSE_STR), ("header.typ", HEADER_STR)],
+    )
 });
 
 pub async fn browse(ctx: Extension<Context>, session: Session) -> impl IntoResponse {

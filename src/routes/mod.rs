@@ -90,7 +90,8 @@ pub fn error404() -> (StatusCode, [(HeaderName, &'static str); 1], Vec<u8>) {
 }
 
 pub fn error(code: &str, message: &str) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
-    PDF::main(ERROR_STR).render_with_data(format!("{code}\n{message}"))
+    PDF::make("error.typ", [("error.typ", ERROR_STR)])
+        .render_with_data(format!("{code}\n{message}"))
 }
 
 pub fn render_into<I: Into<Vec<u8>>>(pdf: &mut PDF, data: I) -> Response<Body> {

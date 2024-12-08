@@ -73,7 +73,7 @@
 #let footer = context [
   #set text(size: 8pt)
   #line(length: 100%,stroke: 0.2pt + gray)
-  PDForum - 2024-10-24
+  PDForum - #smallcaps(datetime.today().display("[year]-[month]-[day]"))
   #h(1fr)
   #counter(page).display(
     "1/1",

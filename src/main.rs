@@ -1,13 +1,16 @@
+pub mod database;
 pub mod render;
 pub mod routes;
-pub mod database;
 
 use std::{env, sync::Arc};
 
 use anyhow::Result;
 use axum::{routing::get, Extension, Router};
 use sqlx::{postgres::PgPoolOptions, PgPool};
-use tower_sessions::{cookie::{time::Duration, SameSite}, Expiry, MemoryStore, SessionManagerLayer};
+use tower_sessions::{
+    cookie::{time::Duration, SameSite},
+    Expiry, MemoryStore, SessionManagerLayer,
+};
 
 #[derive(Clone, Debug)]
 pub struct Context {
@@ -29,7 +32,7 @@ async fn main() -> Result<()> {
 
     let ctx = Context {
         base_url: Arc::new(base_url),
-        db
+        db,
     };
 
     let postgres_layer = Extension(ctx);
@@ -56,7 +59,10 @@ async fn main() -> Result<()> {
         .unwrap();
 
     // help me
-    println!("unfortunately we are listening on {}", listener.local_addr().unwrap());
+    println!(
+        "unfortunately we are listening on {}",
+        listener.local_addr().unwrap()
+    );
     axum::serve(listener, app).await.unwrap();
 
     Ok(())

@@ -1,10 +1,20 @@
-
-use std::{collections::HashMap, path::{Path, PathBuf}};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use chrono::{DateTime, Datelike, FixedOffset, Local, Utc};
 use comemo::track;
 use ecow::EcoVec;
-use typst::{compile, diag::{FileError, FileResult, SourceDiagnostic}, foundations::{Bytes, Datetime, Smart}, syntax::{FileId, Source, VirtualPath}, text::{Font, FontBook}, utils::LazyHash, Library, World};
+use typst::{
+    compile,
+    diag::{FileError, FileResult, SourceDiagnostic},
+    foundations::{Bytes, Datetime, Smart},
+    syntax::{FileId, Source, VirtualPath},
+    text::{Font, FontBook},
+    utils::LazyHash,
+    Library, World,
+};
 use typst_kit::fonts::{FontSlot, Fonts};
 
 use anyhow::Result;
@@ -24,11 +34,10 @@ pub struct PDF {
     /// Fake isolated filesystem
     files: HashMap<FileId, Bytes>,
     /// Fake isolated filesystem but exclusively storing source files
-    sources: HashMap<FileId, Source>
+    sources: HashMap<FileId, Source>,
 }
 
 impl PDF {
-
     pub fn main<I: Into<String>>(data: I) -> Self {
         let mut pdf = Self::new("main.typ");
         pdf.write_source("main.typ", data);
@@ -43,9 +52,7 @@ impl PDF {
 
         let main = FileId::new(None, main_path);
 
-        let fonts = Fonts::searcher()
-            .include_system_fonts(true)
-            .search();
+        let fonts = Fonts::searcher().include_system_fonts(true).search();
 
         Self {
             main,
@@ -68,7 +75,7 @@ impl PDF {
 
     pub fn write_source<M: Into<PathBuf>, I: Into<String>>(&mut self, path: M, data: I) {
         let vpath = VirtualPath::new(path.into());
-        
+
         let id = FileId::new(None, vpath);
 
         let data = data.into();
@@ -79,18 +86,21 @@ impl PDF {
 
     pub fn render(&mut self) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
         let document = compile(self).output?;
-    
+
         let options = PdfOptions {
             ident: Smart::Auto,
             timestamp: self.today(None),
             page_ranges: None,
-            standards: PdfStandards::default()
+            standards: PdfStandards::default(),
         };
 
         typst_pdf::pdf(&document, &options)
     }
 
-    pub fn render_with_data<I: Into<Vec<u8>>>(&mut self, data: I) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
+    pub fn render_with_data<I: Into<Vec<u8>>>(
+        &mut self,
+        data: I,
+    ) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
         self.write("data.txt", data);
         self.render()
     }
@@ -111,11 +121,17 @@ impl World for PDF {
     }
 
     fn source(&self, id: FileId) -> FileResult<Source> {
-        self.sources.get(&id).cloned().ok_or_else(|| FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
+        self.sources
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        self.files.get(&id).cloned().ok_or_else(|| FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
+        self.files
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| FileError::NotFound(id.vpath().as_rootless_path().to_path_buf()))
     }
 
     fn font(&self, index: usize) -> Option<Font> {

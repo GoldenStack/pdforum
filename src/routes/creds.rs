@@ -1,6 +1,10 @@
 use std::fmt::{self, Display};
 
-use axum::{extract::Path, response::{IntoResponse, Redirect}, Extension};
+use axum::{
+    extract::Path,
+    response::{IntoResponse, Redirect},
+    Extension,
+};
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 
@@ -32,7 +36,7 @@ struct Credentials {
 enum CredentialsField {
     #[default]
     Username,
-    Password
+    Password,
 }
 
 impl Credentials {
@@ -58,34 +62,53 @@ impl Credentials {
             CredentialsField::Password => &mut self.password,
         }
     }
-
 }
 
 impl Display for CredentialsField {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CredentialsField::Username => write!(f, "username"), 
+            CredentialsField::Username => write!(f, "username"),
             CredentialsField::Password => write!(f, "password"),
         }
     }
 }
 
-pub async fn register(ctx: Extension<Context>, session: Session, Path(suffix): Path<String>) -> impl IntoResponse {
-    let Ok(mut register) = session.get::<Credentials>(REGISTRATION).await.map(Option::unwrap_or_default) else {
+pub async fn register(
+    ctx: Extension<Context>,
+    session: Session,
+    Path(suffix): Path<String>,
+) -> impl IntoResponse {
+    let Ok(mut register) = session
+        .get::<Credentials>(REGISTRATION)
+        .await
+        .map(Option::unwrap_or_default)
+    else {
         return error500().into_response();
     };
 
     println!("{:?}, {}", register, suffix);
 
-    if suffix == "next" { 
+    if suffix == "next" {
         if !register.next() {
             match database::register(&ctx.db, &register.username, &register.password).await {
                 Ok(true) => {
-                    let Ok(register) = session.remove::<Credentials>(REGISTRATION).await.map(Option::unwrap_or_default) else {
+                    let Ok(register) = session
+                        .remove::<Credentials>(REGISTRATION)
+                        .await
+                        .map(Option::unwrap_or_default)
+                    else {
                         return error500().into_response();
                     };
-                
-                    session.insert(AUTH, Auth { username: register.username }).await.unwrap();
+
+                    session
+                        .insert(
+                            AUTH,
+                            Auth {
+                                username: register.username,
+                            },
+                        )
+                        .await
+                        .unwrap();
                     return Redirect::temporary("/").into_response();
                 }
                 Ok(false) | Err(_) => {
@@ -105,10 +128,13 @@ pub async fn register(ctx: Extension<Context>, session: Session, Path(suffix): P
 
     let mut page = CREDENTIALS.lock();
 
-    let data = format!(r#"url: {}
+    let data = format!(
+        r#"url: {}
 path: "/register/"
 auth: {auth}
-field: {}"#, ctx.base_url, register.field);
+field: {}"#,
+        ctx.base_url, register.field
+    );
 
     page.write("info.yml", data);
 
@@ -119,8 +145,16 @@ pub async fn register_empty(ctx: Extension<Context>, session: Session) -> impl I
     register(ctx, session, Path(String::new())).await
 }
 
-pub async fn login(ctx: Extension<Context>, session: Session, Path(suffix): Path<String>) -> impl IntoResponse {
-    let Ok(mut register) = session.get::<Credentials>(LOGIN).await.map(Option::unwrap_or_default) else {
+pub async fn login(
+    ctx: Extension<Context>,
+    session: Session,
+    Path(suffix): Path<String>,
+) -> impl IntoResponse {
+    let Ok(mut register) = session
+        .get::<Credentials>(LOGIN)
+        .await
+        .map(Option::unwrap_or_default)
+    else {
         return error500().into_response();
     };
 
@@ -128,11 +162,23 @@ pub async fn login(ctx: Extension<Context>, session: Session, Path(suffix): Path
         if !register.next() {
             match database::login(&ctx.db, &register.username, &register.password).await {
                 Ok(true) => {
-                    let Ok(register) = session.remove::<Credentials>(LOGIN).await.map(Option::unwrap_or_default) else {
+                    let Ok(register) = session
+                        .remove::<Credentials>(LOGIN)
+                        .await
+                        .map(Option::unwrap_or_default)
+                    else {
                         return error500().into_response();
                     };
-                
-                    session.insert(AUTH, Auth { username: register.username }).await.unwrap();
+
+                    session
+                        .insert(
+                            AUTH,
+                            Auth {
+                                username: register.username,
+                            },
+                        )
+                        .await
+                        .unwrap();
                     return Redirect::temporary("/").into_response();
                 }
                 Ok(false) | Err(_) => {
@@ -152,10 +198,13 @@ pub async fn login(ctx: Extension<Context>, session: Session, Path(suffix): Path
 
     let mut page = CREDENTIALS.lock();
 
-    let data = format!(r#"url: {}
+    let data = format!(
+        r#"url: {}
 path: "/login/"
 auth: {auth}
-field: {}"#, ctx.base_url, register.field);
+field: {}"#,
+        ctx.base_url, register.field
+    );
 
     page.write("info.yml", data);
 

@@ -5,14 +5,14 @@ use tower_sessions::Session;
 
 use crate::{render::PDF, Context};
 
-use super::{render_into, Auth, Page, AUTH, HEADER_STR};
+use super::{render_into, Auth, Page, AUTH, COMMON_STR};
 
 const BROWSE_STR: &str = include_str!("../../templates/browse.typ");
 
 static BROWSE: Page = Page::new(|| {
     PDF::make(
         "browse.typ",
-        [("browse.typ", BROWSE_STR), ("header.typ", HEADER_STR)],
+        [("browse.typ", BROWSE_STR), ("common.typ", COMMON_STR)],
     )
 });
 

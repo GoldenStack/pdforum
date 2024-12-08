@@ -69,3 +69,31 @@
 ]
 
 #let header(url, signed-in) = navbar(url, signed-in) + brand + info
+
+#let footer = context [
+  #set text(size: 8pt)
+  #line(length: 100%,stroke: 0.2pt + gray)
+  PDForum - 2024-10-24
+  #h(1fr)
+  #counter(page).display(
+    "1/1",
+    both: true,
+  )
+]
+
+#let common(info, doc) = {
+  set text(size: 10pt, weight: "regular", style: "normal")
+  
+  set page("a4",
+    margin:(top: 2cm,
+    bottom: 2cm,
+    left: 2.5cm, right: 2cm))
+    
+  set page(footer: footer)
+  
+  place(top, float: true, scope: "parent")[
+    #show: header(info.url, info.auth)
+  ]
+
+  doc
+}

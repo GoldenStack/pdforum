@@ -46,7 +46,7 @@ impl Page {
 }
 
 pub(crate) const ERROR_STR: &str = include_str!("../../templates/error.typ");
-pub(crate) const HEADER_STR: &str = include_str!("../../templates/header.typ");
+pub(crate) const COMMON_STR: &str = include_str!("../../templates/common.typ");
 pub(crate) const KEYBOARD_STR: &str = include_str!("../../templates/keyboard.typ");
 
 const TYPE_PDF: (HeaderName, &str) = (CONTENT_TYPE, "application/pdf");

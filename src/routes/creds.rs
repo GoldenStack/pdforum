@@ -10,7 +10,7 @@ use tower_sessions::Session;
 
 use crate::{database, render::PDF, Context};
 
-use super::{error500, render_into, Auth, Page, AUTH, HEADER_STR, KEYBOARD_STR};
+use super::{error500, render_into, Auth, Page, AUTH, COMMON_STR, KEYBOARD_STR};
 
 const CREDENTIALS_STR: &str = include_str!("../../templates/credentials.typ");
 
@@ -19,7 +19,7 @@ static CREDENTIALS: Page = Page::new(|| {
         "credentials.typ",
         [
             ("credentials.typ", CREDENTIALS_STR),
-            ("header.typ", HEADER_STR),
+            ("common.typ", COMMON_STR),
             ("keyboard.typ", KEYBOARD_STR),
         ],
     )

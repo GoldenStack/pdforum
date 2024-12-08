@@ -1,11 +1,14 @@
 use std::{
     collections::HashMap,
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, time::Instant,
 };
+
+use log::{trace, Level::Trace};
 
 use chrono::{DateTime, Datelike, FixedOffset, Local, Utc};
 use comemo::track;
 use ecow::EcoVec;
+use log::log_enabled;
 use typst::{
     compile,
     diag::{FileError, FileResult, SourceDiagnostic},
@@ -109,6 +112,19 @@ impl PDF {
         &mut self,
         data: I,
     ) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
+        // If trace logging is enabled, time it!
+        if log_enabled!(Trace) {
+            let start = Instant::now();
+
+            self.write("data.txt", data);
+            let result = self.render();
+
+            trace!("Rendered {:?} in {:?}", self.main, start.elapsed());
+
+            return result;
+        }
+
+        // Otherwise, just do everything normally
         self.write("data.txt", data);
         self.render()
     }

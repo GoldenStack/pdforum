@@ -6,6 +6,7 @@ use std::{env, sync::Arc};
 
 use anyhow::Result;
 use axum::{routing::get, Extension, Router};
+use log::{info, LevelFilter};
 use sqlx::PgPool;
 use tower_sessions::{
     cookie::{time::Duration, SameSite},
@@ -21,6 +22,12 @@ pub struct Context {
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv()?;
+
+    env_logger::builder()
+        .filter_module("tracing::span", LevelFilter::Warn)
+        .filter_module("tower_sessions", LevelFilter::Warn)
+        .filter_module("tower_sessions_core", LevelFilter::Warn)
+        .try_init()?;
 
     let base_url = env::var("BASE_URL")?;
 
@@ -53,7 +60,7 @@ async fn main() -> Result<()> {
         .unwrap();
 
     // help me
-    println!(
+    info!(
         "unfortunately we are listening on {}",
         listener.local_addr().unwrap()
     );

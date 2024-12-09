@@ -5,7 +5,7 @@
       
       #smallcaps(lower(link(url + "/")[BROWSE] + h(5%) + link(url + "/publish")[PUBLISH] + h(5%) + link(url + "/announcements")[ANNOUNCEMENTS] + h(5%) + {
         if signed-in {
-          link(url + "/logout")[ACCOUNT] + h(5%) + link(url + "/settings")[SETTINGS]
+          link(url + "/logout")[LOGOUT] + h(5%) + link(url + "/settings")[SETTINGS]
         } else {
           link(url + "/login")[LOGIN] + h(5%) + link(url + "/register")[REGISTER]
         }

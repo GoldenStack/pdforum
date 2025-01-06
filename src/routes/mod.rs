@@ -97,6 +97,9 @@ pub fn error(code: &str, message: &str) -> Result<Vec<u8>, EcoVec<SourceDiagnost
 pub fn render_into<I: Into<Vec<u8>>>(pdf: &mut PDF, data: I) -> Response<Body> {
     match pdf.render_with_data(data) {
         Ok(buffer) => (StatusCode::OK, [TYPE_PDF], buffer).into_response(),
-        Err(_) => error500().into_response(),
+        Err(err) => {
+            println!("{err:?}");
+            error500().into_response()
+        } 
     }
 }

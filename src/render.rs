@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
-    path::{Path, PathBuf}, time::Instant,
+    path::{Path, PathBuf},
+    time::Instant,
 };
 
 use log::{trace, Level::Trace};
@@ -24,7 +25,7 @@ use anyhow::Result;
 use typst_pdf::{PdfOptions, PdfStandards};
 
 /// A PDF to be rendered with PDForum.
-/// 
+///
 /// This is a Typst [World], except it implements a fake filesystem which is
 /// internally just an in-memory [HashMap]. This simplifies the overall
 /// workflow, makes the entire rendering process faster, and prevents, in the
@@ -99,7 +100,7 @@ impl PDF {
     /// Writes a source file to this filesystem. It must be valid UTF-8.
     /// This will allow it to be treated both as a source file and a binary
     /// file, but only source files can be actually loaded.
-    /// 
+    ///
     /// Generally, source files will be written to once when creating the PDF,
     /// while non-source files will be written to before each render.
     pub fn write_source<M: Into<PathBuf>, I: Into<String>>(&mut self, path: M, data: I) {

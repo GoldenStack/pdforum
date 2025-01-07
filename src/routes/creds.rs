@@ -52,11 +52,8 @@ impl Credentials {
         }
     }
 
-    fn into_field(self) -> String {
-        match self.field {
-            CredentialsField::Username => self.username,
-            CredentialsField::Password => self.password,
-        }
+    fn into_data(self) -> String {
+        format!("{}\u{0}{}", self.username, self.password)
     }
 
     fn field_mut(&mut self) -> &mut String {
@@ -131,7 +128,7 @@ pub async fn register(
 
     let data = format!(
         r#"url: {}
-path: "/register/"
+type: "register"
 auth: {auth}
 field: {}"#,
         ctx.base_url, register.field
@@ -139,7 +136,7 @@ field: {}"#,
 
     page.write("info.yml", data);
 
-    render_into(&mut page, register.into_field())
+    render_into(&mut page, register.into_data())
 }
 
 pub async fn register_empty(ctx: Extension<Context>, session: Session) -> impl IntoResponse {
@@ -201,7 +198,7 @@ pub async fn login(
 
     let data = format!(
         r#"url: {}
-path: "/login/"
+type: "login"
 auth: {auth}
 field: {}"#,
         ctx.base_url, register.field
@@ -209,7 +206,7 @@ field: {}"#,
 
     page.write("info.yml", data);
 
-    render_into(&mut page, register.into_field())
+    render_into(&mut page, register.into_data())
 }
 
 pub async fn login_empty(ctx: Extension<Context>, session: Session) -> impl IntoResponse {

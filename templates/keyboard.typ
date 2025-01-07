@@ -1,9 +1,5 @@
 // thank you keyle :)
-#let button(content, width, url: none) = {
-  let text-color = black
-  let stroke-color = rgb("#555")
-  let bg-color = rgb("#fff")
-
+#let text-box(content, width, url: none, stroke-color: rgb("#555"), bg-color: rgb("#fff")) = {
   let content = pad(y: 4pt, content)
 
   let cust-rect = rect.with(
@@ -13,45 +9,42 @@
   )
 
   let button = cust-rect(
-    align(horizon, text(fill: text-color, content)),
+    align(horizon, content),
   )
   let shadow = cust-rect(
     outset: 2.2pt,
     fill: bg-color,
     stroke: stroke-color + 1.2pt,
-    align(horizon, text(fill: text-color, content)),
+    align(horizon, content),
   )
   {
     place(shadow)
     if url == none {
       button
-    } else {    
+    } else {
       link(url, button)
     }
   }
 }
 
-#let key(content, url) = {
-  let text-color = white
-  let bg-color = rgb("#333")
-  let stroke-color = rgb("#2b2b2b")
-
+#let key(content, url, bg-color: rgb("#2b2b2b"), stroke-color: rgb("#333")) = {
   let cust-rect = rect.with(
     width: 36pt,
     height: 36pt,
-    stroke: bg-color,
-    fill: stroke-color,
+    stroke: stroke-color,
+    fill: bg-color,
     radius: 50%,
   )
 
-  let button = cust-rect(
-    align(center + horizon, text(fill: white, content)),
-  )
+  let text = align(center + horizon, content);
+
+  let button = cust-rect(text)
+  
   let shadow = cust-rect(
     outset: 2.2pt,
     fill: white,
     stroke: stroke-color + 1.2pt,
-    align(center + horizon, text(fill: white, content)),
+    text,
   )
   {
     place(shadow)
@@ -66,7 +59,7 @@
       inset: 5pt,
       align: left,
       "",
-      ..chars.map(x => key(text(size: 28pt, upper(x)), url + x)),
+      ..chars.map(x => key(text(size: 28pt, fill: white, upper(x)), url + x)),
       ""
     )
   }
@@ -76,27 +69,29 @@
   row(url, chars: "zxcvbnm".codepoints(), left-pad: 0.5fr, right-pad: 0.75fr)
 }
 
-#let input_and_keyboard(title, input, base-url) = {
-  align(center, {
-    align(left, {        
-      v(4%)
+#let text-box-next(content, base-url, selected: true) = {
+  if selected {
+    content += strong[$bracket.b$]
+  }
   
-      text(size: 18pt, fill: luma(80))[
-        #h(5.5pt)
-        #title
-      ]
+  let content = text(font: "New Computer Modern", size: 24pt, content)
   
-      v(-3%)
-  
-      grid(
-        inset: 8pt,
-        columns: (1fr, auto),
-        button(text(font: "New Computer Modern", size: 24pt, input + strong[$bracket.b$]), 100%),
-        align(horizon, box(key(align(center, text(size: 24pt, $arrow.l.hook$)), base-url + "next")))
-      )
-  
-      keyboard(base-url)
-    })
-  })
+  let content-box = if selected {
+    text-box(content, 100%)
+  } else {
+    text-box(stroke-color: luma(160), text(fill: luma(180), content), 100%)
+  }
 
+  let next-box = if selected {
+    key(align(center, text(size: 24pt, fill: white, $arrow.l.hook$)), base-url + "next")
+  } else {
+    // key(bg-color: luma(220), stroke-color: luma(190), align(center, text(size: 24pt, fill: white, $arrow.l.hook$)), base-url + "next")
+    v(36pt)
+  }
+  
+  grid(
+    column-gutter: 10pt,
+    columns: (1fr, 52pt),
+    content-box, next-box
+  )
 }

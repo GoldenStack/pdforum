@@ -57,12 +57,13 @@ pub async fn register(pg: &PgPool, username: &str, password: &str) -> Result<Opt
 }
 
 /// Checks whether or not the provided password is valid for the given username.
-/// If the user exists, returns whether or not the provided password is valid.
+/// If the user exists, returns the ID of the user (`Ok(Some(id))`). If the user
+/// doesn't exist, returns nothing.
 /// If there is an SQL error (including the user not existing), `Err` is
 /// returned.
-pub async fn login(pg: &PgPool, username: &str, password: &str) -> Result<bool, sqlx::Error> {
+pub async fn login(pg: &PgPool, username: &str, password: &str) -> Result<Option<i32>, sqlx::Error> {
     let result = sqlx::query!(
-        "SELECT password, salt FROM users WHERE username = $1",
+        "SELECT id, password, salt FROM users WHERE username = $1",
         username
     )
     .fetch_one(pg)
@@ -71,7 +72,11 @@ pub async fn login(pg: &PgPool, username: &str, password: &str) -> Result<bool, 
     let salt = result.salt.as_slice();
     let correct_hash = result.password.as_slice();
 
-    Ok(hash_salt(password, salt) == correct_hash)
+    if hash_salt(password, salt) == correct_hash {
+        Ok(Some(result.id))
+    } else {
+        Ok(None)
+    }
 }
 
 /// Hashes the provided password, generating a salt, hashing the password with

@@ -160,7 +160,7 @@ pub async fn login(
     if suffix == "next" {
         if !register.next() {
             match database::login(&ctx.db, &register.username, &register.password).await {
-                Ok(true) => {
+                Ok(Some(id)) => {
                     let Ok(register) = session
                         .remove::<Credentials>(LOGIN)
                         .await
@@ -173,6 +173,7 @@ pub async fn login(
                         .insert(
                             AUTH,
                             Auth {
+                                id,
                                 username: register.username,
                             },
                         )
@@ -180,7 +181,7 @@ pub async fn login(
                         .unwrap();
                     return Redirect::temporary("/").into_response();
                 }
-                Ok(false) | Err(_) => {
+                Ok(None) | Err(_) => {
                     todo!()
                 }
             }

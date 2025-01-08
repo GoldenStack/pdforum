@@ -83,7 +83,7 @@
   }
 
   let next-box = if selected {
-    key(align(center, text(size: 24pt, fill: white, $arrow.l.hook$)), base-url + "next")
+    align(horizon, box(key(align(center, text(size: 24pt, fill: white, $arrow.l.hook$)), base-url + "next")))
   } else {
     // key(bg-color: luma(220), stroke-color: luma(190), align(center, text(size: 24pt, fill: white, $arrow.l.hook$)), base-url + "next")
     v(36pt)

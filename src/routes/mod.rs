@@ -1,5 +1,6 @@
 pub mod browse;
 pub mod creds;
+pub mod publish;
 
 use std::sync::{Arc, OnceLock};
 

@@ -56,6 +56,7 @@ pub const AUTH: &str = "auth";
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 struct Auth {
+    id: i32,
     username: String,
 }
 

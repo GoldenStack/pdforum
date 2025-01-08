@@ -20,23 +20,25 @@ pub async fn open_connection() -> Result<PgPool> {
 }
 
 /// Attempts to register the provided user with the given password. Returns
-/// `Ok(true)` if the user was registered, `Ok(false)` if a user with the given
-/// username already existed, and `Err` if a miscellaneous SQL error occurred.
-pub async fn register(pg: &PgPool, username: &str, password: &str) -> Result<bool, sqlx::Error> {
+/// `Ok(Some(id))` if the user was registered, `Ok(None)` if a user with the given
+/// username already existed, and `Err` if a miscellaneous SQL error occurred,
+/// where the returned ID is the unique integer ID referring to the user.
+pub async fn register(pg: &PgPool, username: &str, password: &str) -> Result<Option<i32>, sqlx::Error> {
     let (password, salt) = hash(password);
 
     let result = sqlx::query!(
-        "INSERT INTO users (username, password, salt) VALUES ($1, $2, $3)",
+        "INSERT INTO users (username, password, salt) VALUES ($1, $2, $3) RETURNING id",
         username,
         &password,
         &salt
     )
-    .execute(pg)
+    .fetch_one(pg)
     .await;
 
     // User registered, good!
-    let Err(err) = result else {
-        return Ok(true);
+    let err = match result {
+        Ok(record) => return Ok(Some(record.id)),
+        Err(err) => err,
     };
 
     // Filter for "duplicate key value violates unique constraint"
@@ -48,7 +50,7 @@ pub async fn register(pg: &PgPool, username: &str, password: &str) -> Result<boo
         .is_some();
 
     if user_already_exists {
-        Ok(false)
+        Ok(None)
     } else {
         Err(err)
     }

@@ -89,7 +89,7 @@ pub async fn register(
     if suffix == "next" {
         if !register.next() {
             match database::register(&ctx.db, &register.username, &register.password).await {
-                Ok(true) => {
+                Ok(Some(id)) => {
                     let Ok(register) = session
                         .remove::<Credentials>(REGISTRATION)
                         .await
@@ -102,6 +102,7 @@ pub async fn register(
                         .insert(
                             AUTH,
                             Auth {
+                                id,
                                 username: register.username,
                             },
                         )
@@ -109,7 +110,7 @@ pub async fn register(
                         .unwrap();
                     return Redirect::temporary("/").into_response();
                 }
-                Ok(false) | Err(_) => {
+                Ok(None) | Err(_) => {
                     todo!()
                 }
             }

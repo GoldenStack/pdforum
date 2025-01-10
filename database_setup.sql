@@ -16,3 +16,13 @@ CREATE TABLE "users" (
     password   BYTEA NOT NULL,
     salt       BYTEA NOT NULL
 );
+
+-- Create the table for posts
+CREATE TABLE "posts" (
+    id         SERIAL PRIMARY KEY,
+
+    author     INTEGER NOT NULL,
+
+    content    TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -79,11 +79,24 @@ pub async fn login(pg: &PgPool, username: &str, password: &str) -> Result<Option
     }
 }
 
+/// Publishes a message as the given author, returning the ID of the posted
+/// message (or an SQL error if one occurred).
+pub async fn publish(pg: &PgPool, author: i32, content: &str) -> Result<i32, sqlx::Error> {
+    let result = sqlx::query!(
+        "INSERT INTO posts (author, content) VALUES ($1, $2) RETURNING id",
+        author, content
+    )
+    .fetch_one(pg)
+    .await?;
+
+    Ok(result.id)
+}
+
 /// Hashes the provided password, generating a salt, hashing the password with
 /// it, and then returning both.
 ///
 /// See [hash_salt] for a note on the hashing function used.
-pub fn hash(password: &str) -> ([u8; 32], [u8; 8]) {
+fn hash(password: &str) -> ([u8; 32], [u8; 8]) {
     let mut salt = [0; 8];
 
     OsRng.fill_bytes(&mut salt);
@@ -100,7 +113,7 @@ pub fn hash(password: &str) -> ([u8; 32], [u8; 8]) {
 /// secure. Sorry!
 ///
 /// [Argon2id]: https://en.wikipedia.org/wiki/Argon2
-pub fn hash_salt(password: &str, salt: &[u8]) -> [u8; 32] {
+fn hash_salt(password: &str, salt: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
 
     hasher.update(password);

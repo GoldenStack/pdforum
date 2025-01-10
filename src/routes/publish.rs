@@ -2,7 +2,7 @@
 use axum::{extract::Path, response::{IntoResponse, Redirect}, Extension};
 use tower_sessions::Session;
 
-use crate::{render::PDF, Context};
+use crate::{database, render::PDF, Context};
 
 use super::{error500, render_into, Auth, Page, AUTH, COMMON_STR, KEYBOARD_STR};
 
@@ -34,8 +34,23 @@ pub async fn publish(
         return error500().into_response();
     };
 
-    if suffix == "next" {
-        todo!()
+    let Ok(Some(auth)) = session
+        .get::<Auth>(AUTH)
+        .await
+    else {
+        return Redirect::temporary("/login").into_response();
+    };
+
+    if suffix == "next" && !publish.is_empty() {
+        return match database::publish(&ctx.db, auth.id, publish.as_str()).await {
+            Ok(id) => {
+                session.remove::<String>(PUBLISHING).await.unwrap();
+                format!("im the eeper... published post {id}").into_response()
+            },
+            Err(_) => {
+                todo!()
+            }
+        }
     } else if suffix.len() == 1 {
         publish.push_str(suffix.as_str());
     } else {
@@ -43,13 +58,6 @@ pub async fn publish(
     }
 
     session.insert(PUBLISHING, &publish).await.unwrap();
-
-    let Ok(Some(auth)) = session
-        .get::<Auth>(AUTH)
-        .await
-    else {
-        return Redirect::temporary("/login").into_response();
-    };
 
     let mut page = PUBLISH.lock();
 

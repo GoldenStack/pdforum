@@ -4,7 +4,7 @@ PDForum is a PDF-only social media website.
 
 That's right. There's no HTML. No CSS. Just pure, static, dynamically-rendered PDFs.
 
-https://github.com/GoldenStack/pdforum/blob/master/demo.webm
+<video src="https://github.com/GoldenStack/pdforum/blob/master/demo.webm">
 
 ### Why?
 

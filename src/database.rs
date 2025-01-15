@@ -3,7 +3,7 @@ use std::env;
 use anyhow::Result;
 use rand::{rngs::OsRng, RngCore};
 use sha2::{Digest, Sha256};
-use sqlx::{error::DatabaseError, postgres::PgPoolOptions, PgPool};
+use sqlx::{error::DatabaseError, postgres::PgPoolOptions, types::time::OffsetDateTime, PgPool};
 
 /// Opens a connection to the Postgres database.
 /// This uses the Postgres connection string defined in the `DATABASE_URL`
@@ -90,6 +90,37 @@ pub async fn publish(pg: &PgPool, author: i32, content: &str) -> Result<i32, sql
     .await?;
 
     Ok(result.id)
+}
+
+/// A post loaded from the database.
+pub struct Post {
+    pub id: i32,
+    pub author: String,
+    pub created_at: OffsetDateTime,
+    pub content: String,
+}
+
+/// Returns a page of browsing results for an arbitrary user.
+pub async fn browse(pg: &PgPool) -> Result<Vec<Post>, sqlx::Error> {
+    let result = sqlx::query!(
+        "SELECT posts.id, posts.content, posts.created_at, users.username
+        FROM posts
+        INNER JOIN users
+        ON posts.author=users.id
+        ORDER BY posts.created_at DESC
+        FETCH NEXT 10 ROWS ONLY",
+    )
+    .fetch_all(pg)
+    .await?;
+
+    Ok(result.into_iter().map(|record| {
+        Post {
+            id: record.id,
+            author: record.username,
+            created_at: record.created_at,
+            content: record.content
+        }
+    }).collect::<Vec<_>>())
 }
 
 /// Hashes the provided password, generating a salt, hashing the password with

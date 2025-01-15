@@ -4,6 +4,7 @@ pub mod publish;
 
 use std::sync::{Arc, OnceLock};
 
+use anyhow::anyhow;
 use axum::{
     body::Body,
     http::{header::CONTENT_TYPE, HeaderName, Response, StatusCode},
@@ -15,6 +16,8 @@ use serde::{Deserialize, Serialize};
 use typst::diag::SourceDiagnostic;
 
 use crate::render::PDF;
+
+pub type Return = Result<Response<Body>, Error>;
 
 /// A static PDF, stored with an initializer function.
 ///
@@ -74,16 +77,6 @@ pub fn error500() -> impl IntoResponse {
     )
 }
 
-pub fn error400() -> impl IntoResponse {
-    static ERROR: OnceLock<Vec<u8>> = OnceLock::new();
-    let error400 = ERROR.get_or_init(|| {
-        error("400", "bad request")
-            .expect("Could not render fallback '400: bad request' page. Aborting program")
-    });
-
-    (StatusCode::BAD_REQUEST, [TYPE_PDF], Vec::clone(error400))
-}
-
 pub fn error404() -> (StatusCode, [(HeaderName, &'static str); 1], Vec<u8>) {
     let error404 = error("404", "not found")
         .expect("Could not render fallback '404: not found' page. Aborting program");
@@ -96,12 +89,28 @@ pub fn error(code: &str, message: &str) -> Result<Vec<u8>, EcoVec<SourceDiagnost
         .render_with_data(format!("{code}\n{message}"))
 }
 
-pub fn render_into<I: Into<Vec<u8>>>(pdf: &mut PDF, data: I) -> Response<Body> {
-    match pdf.render_with_data(data) {
-        Ok(buffer) => (StatusCode::OK, [TYPE_PDF], buffer).into_response(),
-        Err(err) => {
-            println!("{err:?}");
-            error500().into_response()
-        } 
+pub struct Error(anyhow::Error);
+
+impl IntoResponse for Error {
+    fn into_response(self) -> axum::response::Response {
+        log::error!("500: {:?}", self.0);
+
+        error500().into_response()
     }
+}
+
+impl <E> From<E> for Error where E: Into<anyhow::Error> {
+    fn from(value: E) -> Self {
+        Error(value.into())
+    }
+}
+
+pub fn render_into<I: Into<Vec<u8>>>(pdf: &mut PDF, data: I) -> Return {
+    pdf.render_with_data(data)
+    .map(|data| (
+        StatusCode::OK,
+        [TYPE_PDF],
+        data
+    ).into_response())
+    .map_err(|vec| anyhow!("{vec:?}").into())
 }

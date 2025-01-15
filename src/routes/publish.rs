@@ -4,7 +4,7 @@ use tower_sessions::Session;
 
 use crate::{database, render::PDF, Context};
 
-use super::{error500, render_into, Auth, Page, AUTH, COMMON_STR, KEYBOARD_STR};
+use super::{render_into, Auth, Page, Return, AUTH, COMMON_STR, KEYBOARD_STR};
 
 const PUBLISH_STR: &str = include_str!("../../templates/publish.typ");
 
@@ -25,39 +25,31 @@ pub async fn publish(
     ctx: Extension<Context>,
     session: Session,
     Path(suffix): Path<String>,
-) -> impl IntoResponse {
-    let Ok(mut publish) = session
+) -> Return {
+    let mut publish = session
         .get::<String>(PUBLISHING)
         .await
-        .map(Option::unwrap_or_default)
-    else {
-        return error500().into_response();
-    };
+        .map(Option::unwrap_or_default)?;
 
     let Ok(Some(auth)) = session
         .get::<Auth>(AUTH)
         .await
     else {
-        return Redirect::temporary("/login").into_response();
+        return Ok(Redirect::temporary("/login").into_response());
     };
 
     if suffix == "next" && !publish.is_empty() {
-        return match database::publish(&ctx.db, auth.id, publish.as_str()).await {
-            Ok(id) => {
-                session.remove::<String>(PUBLISHING).await.unwrap();
-                format!("im the eeper... published post {id}").into_response()
-            },
-            Err(_) => {
-                todo!()
-            }
-        }
+        let id = database::publish(&ctx.db, auth.id, publish.as_str()).await?;
+
+        session.remove::<String>(PUBLISHING).await?;
+        return Ok(format!("im the eeper... published post {id}").into_response());
     } else if suffix.len() == 1 {
         publish.push_str(suffix.as_str());
     } else {
         publish = String::default();
     }
 
-    session.insert(PUBLISHING, &publish).await.unwrap();
+    session.insert(PUBLISHING, &publish).await?;
 
     let mut page = PUBLISH.lock();
 
@@ -75,6 +67,6 @@ username: {}"#,
 
 
 
-pub async fn publish_empty(ctx: Extension<Context>, session: Session) -> impl IntoResponse {
+pub async fn publish_empty(ctx: Extension<Context>, session: Session) -> Return {
     publish(ctx, session, Path(String::new())).await
 }

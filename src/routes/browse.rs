@@ -1,11 +1,11 @@
-use axum::{response::IntoResponse, Extension};
+use axum::Extension;
 use sqlx::types::time::OffsetDateTime;
 use time::Duration;
 use tower_sessions::Session;
 
 use crate::{database, render::PDF, Context};
 
-use super::{render_into, Auth, Page, AUTH, COMMON_STR};
+use super::{render_into, Auth, Page, Return, AUTH, COMMON_STR};
 
 const BROWSE_STR: &str = include_str!("../../templates/browse.typ");
 
@@ -16,18 +16,14 @@ static BROWSE: Page = Page::new(|| {
     )
 });
 
-pub async fn browse(ctx: Extension<Context>, session: Session) -> impl IntoResponse {
+pub async fn browse(ctx: Extension<Context>, session: Session) -> Return {
     let mut data = String::new();
 
-    match database::browse(&ctx.db).await {
-        Ok(values) => {
-            for value in values {
-                let time_ago = format_duration_ago(OffsetDateTime::now_utc() - value.created_at);
+    let values = database::browse(&ctx.db).await?;
+    for value in values {
+        let time_ago = format_duration_ago(OffsetDateTime::now_utc() - value.created_at);
 
-                data.push_str(format!("{}\u{0}{}\u{0}{}\u{0}{}\u{0}", value.author, value.id, time_ago, value.content).as_str());
-            }
-        },
-        Err(err) => todo!(),
+        data.push_str(format!("{}\u{0}{}\u{0}{}\u{0}{}\u{0}", value.author, value.id, time_ago, value.content).as_str());
     }
  
     // Chop off the last \u{0}

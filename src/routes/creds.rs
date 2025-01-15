@@ -10,7 +10,7 @@ use tower_sessions::Session;
 
 use crate::{database, render::PDF, Context};
 
-use super::{error500, render_into, Auth, Page, AUTH, COMMON_STR, KEYBOARD_STR};
+use super::{render_into, Auth, Page, Return, AUTH, COMMON_STR, KEYBOARD_STR};
 
 const CREDENTIALS_STR: &str = include_str!("../../templates/credentials.typ");
 
@@ -77,26 +77,21 @@ pub async fn register(
     ctx: Extension<Context>,
     session: Session,
     Path(suffix): Path<String>,
-) -> impl IntoResponse {
-    let Ok(mut register) = session
+) -> Return {
+    let mut register = session
         .get::<Credentials>(REGISTRATION)
         .await
-        .map(Option::unwrap_or_default)
-    else {
-        return error500().into_response();
-    };
+        .map(Option::unwrap_or_default)?;
 
     if suffix == "next" {
         if !register.next() {
-            match database::register(&ctx.db, &register.username, &register.password).await {
-                Ok(Some(id)) => {
-                    let Ok(register) = session
+
+            match database::register(&ctx.db, &register.username, &register.password).await? {
+                Some(id) => {
+                    let register = session
                         .remove::<Credentials>(REGISTRATION)
                         .await
-                        .map(Option::unwrap_or_default)
-                    else {
-                        return error500().into_response();
-                    };
+                        .map(Option::unwrap_or_default)?;
 
                     session
                         .insert(
@@ -106,11 +101,10 @@ pub async fn register(
                                 username: register.username,
                             },
                         )
-                        .await
-                        .unwrap();
-                    return Redirect::temporary("/").into_response();
+                        .await?;
+                    return Ok(Redirect::temporary("/").into_response());
                 }
-                Ok(None) | Err(_) => {
+                None => {
                     todo!()
                 }
             }
@@ -121,7 +115,7 @@ pub async fn register(
         register = Credentials::default();
     }
 
-    session.insert(REGISTRATION, &register).await.unwrap();
+    session.insert(REGISTRATION, &register).await?;
 
     let auth = session.get::<Auth>(AUTH).await.ok().flatten().is_some();
 
@@ -140,7 +134,7 @@ field: {}"#,
     render_into(&mut page, register.into_data())
 }
 
-pub async fn register_empty(ctx: Extension<Context>, session: Session) -> impl IntoResponse {
+pub async fn register_empty(ctx: Extension<Context>, session: Session) -> Return {
     register(ctx, session, Path(String::new())).await
 }
 
@@ -148,26 +142,20 @@ pub async fn login(
     ctx: Extension<Context>,
     session: Session,
     Path(suffix): Path<String>,
-) -> impl IntoResponse {
-    let Ok(mut register) = session
+) -> Return {
+    let mut register = session
         .get::<Credentials>(LOGIN)
         .await
-        .map(Option::unwrap_or_default)
-    else {
-        return error500().into_response();
-    };
+        .map(Option::unwrap_or_default)?;
 
     if suffix == "next" {
         if !register.next() {
-            match database::login(&ctx.db, &register.username, &register.password).await {
-                Ok(Some(id)) => {
-                    let Ok(register) = session
+            match database::login(&ctx.db, &register.username, &register.password).await? {
+                Some(id) => {
+                    let register = session
                         .remove::<Credentials>(LOGIN)
                         .await
-                        .map(Option::unwrap_or_default)
-                    else {
-                        return error500().into_response();
-                    };
+                        .map(Option::unwrap_or_default)?;
 
                     session
                         .insert(
@@ -179,9 +167,9 @@ pub async fn login(
                         )
                         .await
                         .unwrap();
-                    return Redirect::temporary("/").into_response();
+                    return Ok(Redirect::temporary("/").into_response());
                 }
-                Ok(None) | Err(_) => {
+                None => {
                     todo!()
                 }
             }
@@ -192,7 +180,7 @@ pub async fn login(
         register = Credentials::default();
     }
 
-    session.insert(LOGIN, &register).await.unwrap();
+    session.insert(LOGIN, &register).await?;
 
     let auth = session.get::<Auth>(AUTH).await.ok().flatten().is_some();
 
@@ -211,6 +199,6 @@ field: {}"#,
     render_into(&mut page, register.into_data())
 }
 
-pub async fn login_empty(ctx: Extension<Context>, session: Session) -> impl IntoResponse {
+pub async fn login_empty(ctx: Extension<Context>, session: Session) -> Return {
     login(ctx, session, Path(String::new())).await
 }

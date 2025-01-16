@@ -23,13 +23,21 @@ pub async fn browse(ctx: Extension<Context>, session: Session) -> Return {
     for value in values {
         let time_ago = format_duration_ago(OffsetDateTime::now_utc() - value.created_at);
 
-        data.push_str(format!("{}\u{0}{}\u{0}{}\u{0}{}\u{0}", value.author, value.id, time_ago, value.content).as_str());
+        data.push_str(
+            format!(
+                "{}\u{0}{}\u{0}{}\u{0}{}\u{0}",
+                value.author, value.id, time_ago, value.content
+            )
+            .as_str(),
+        );
     }
- 
+
     // Chop off the last \u{0}
     let data = if data.ends_with("\u{0}") {
-        &data[0..data.len()-1]
-    } else { &data };
+        &data[0..data.len() - 1]
+    } else {
+        &data
+    };
 
     let auth = session.get::<Auth>(AUTH).await.ok().flatten().is_some();
 
@@ -57,7 +65,7 @@ fn format_duration_ago(dur: Duration) -> String {
         ("month", MONTH),
         ("day", DAY),
         ("hour", HOUR),
-        ("minute", MINUTE)
+        ("minute", MINUTE),
     ];
 
     for (name, unit) in PAIRS {

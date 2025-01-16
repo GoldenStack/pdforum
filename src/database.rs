@@ -23,7 +23,11 @@ pub async fn open_connection() -> Result<PgPool> {
 /// `Ok(Some(id))` if the user was registered, `Ok(None)` if a user with the given
 /// username already existed, and `Err` if a miscellaneous SQL error occurred,
 /// where the returned ID is the unique integer ID referring to the user.
-pub async fn register(pg: &PgPool, username: &str, password: &str) -> Result<Option<i32>, sqlx::Error> {
+pub async fn register(
+    pg: &PgPool,
+    username: &str,
+    password: &str,
+) -> Result<Option<i32>, sqlx::Error> {
     let (password, salt) = hash(password);
 
     let result = sqlx::query!(
@@ -61,7 +65,11 @@ pub async fn register(pg: &PgPool, username: &str, password: &str) -> Result<Opt
 /// doesn't exist, returns nothing.
 /// If there is an SQL error (including the user not existing), `Err` is
 /// returned.
-pub async fn login(pg: &PgPool, username: &str, password: &str) -> Result<Option<i32>, sqlx::Error> {
+pub async fn login(
+    pg: &PgPool,
+    username: &str,
+    password: &str,
+) -> Result<Option<i32>, sqlx::Error> {
     let result = sqlx::query!(
         "SELECT id, password, salt FROM users WHERE username = $1",
         username
@@ -84,7 +92,8 @@ pub async fn login(pg: &PgPool, username: &str, password: &str) -> Result<Option
 pub async fn publish(pg: &PgPool, author: i32, content: &str) -> Result<i32, sqlx::Error> {
     let result = sqlx::query!(
         "INSERT INTO posts (author, content) VALUES ($1, $2) RETURNING id",
-        author, content
+        author,
+        content
     )
     .fetch_one(pg)
     .await?;
@@ -113,14 +122,15 @@ pub async fn browse(pg: &PgPool) -> Result<Vec<Post>, sqlx::Error> {
     .fetch_all(pg)
     .await?;
 
-    Ok(result.into_iter().map(|record| {
-        Post {
+    Ok(result
+        .into_iter()
+        .map(|record| Post {
             id: record.id,
             author: record.username,
             created_at: record.created_at,
-            content: record.content
-        }
-    }).collect::<Vec<_>>())
+            content: record.content,
+        })
+        .collect::<Vec<_>>())
 }
 
 /// Hashes the provided password, generating a salt, hashing the password with

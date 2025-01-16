@@ -85,7 +85,6 @@ pub async fn register(
 
     if suffix == "next" {
         if !register.next() {
-
             match database::register(&ctx.db, &register.username, &register.password).await? {
                 Some(id) => {
                     let register = session

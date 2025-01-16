@@ -99,7 +99,10 @@ impl IntoResponse for Error {
     }
 }
 
-impl <E> From<E> for Error where E: Into<anyhow::Error> {
+impl<E> From<E> for Error
+where
+    E: Into<anyhow::Error>,
+{
     fn from(value: E) -> Self {
         Error(value.into())
     }
@@ -107,10 +110,6 @@ impl <E> From<E> for Error where E: Into<anyhow::Error> {
 
 pub fn render_into<I: Into<Vec<u8>>>(pdf: &mut PDF, data: I) -> Return {
     pdf.render_with_data(data)
-    .map(|data| (
-        StatusCode::OK,
-        [TYPE_PDF],
-        data
-    ).into_response())
-    .map_err(|vec| anyhow!("{vec:?}").into())
+        .map(|data| (StatusCode::OK, [TYPE_PDF], data).into_response())
+        .map_err(|vec| anyhow!("{vec:?}").into())
 }

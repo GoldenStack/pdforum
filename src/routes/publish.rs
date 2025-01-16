@@ -1,5 +1,8 @@
-
-use axum::{extract::Path, response::{IntoResponse, Redirect}, Extension};
+use axum::{
+    extract::Path,
+    response::{IntoResponse, Redirect},
+    Extension,
+};
 use tower_sessions::Session;
 
 use crate::{database, render::PDF, Context};
@@ -31,10 +34,7 @@ pub async fn publish(
         .await
         .map(Option::unwrap_or_default)?;
 
-    let Ok(Some(auth)) = session
-        .get::<Auth>(AUTH)
-        .await
-    else {
+    let Ok(Some(auth)) = session.get::<Auth>(AUTH).await else {
         return Ok(Redirect::temporary("/login").into_response());
     };
 
@@ -64,8 +64,6 @@ username: {}"#,
 
     render_into(&mut page, publish)
 }
-
-
 
 pub async fn publish_empty(ctx: Extension<Context>, session: Session) -> Return {
     publish(ctx, session, Path(String::new())).await

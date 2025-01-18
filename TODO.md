@@ -6,3 +6,4 @@
 - Settings menu with a bunch of config options
 - Post info menu with buttons like reply
 - User info menu with button leading to it on post in browse/post menu
+- Allow registering files in PDF::make that aren't sources (e.g. svgs)

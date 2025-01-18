@@ -3,7 +3,7 @@ use std::env;
 use anyhow::Result;
 use rand::{rngs::OsRng, RngCore};
 use sha2::{Digest, Sha256};
-use sqlx::{error::DatabaseError, postgres::PgPoolOptions, types::time::OffsetDateTime, PgPool};
+use sqlx::{error::DatabaseError, postgres::PgPoolOptions, PgPool};
 
 use crate::routes::Post;
 

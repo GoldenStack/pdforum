@@ -42,7 +42,7 @@ pub async fn publish(
         let id = database::publish(&ctx.db, auth.id, publish.as_str()).await?;
 
         session.remove::<String>(PUBLISHING).await?;
-        return Ok(format!("im the eeper... published post {id}").into_response());
+        return Ok(Redirect::temporary(&format!("{}/post/{id}", ctx.base_url)).into_response());
     } else if suffix.len() == 1 {
         publish.push_str(suffix.as_str());
     } else {

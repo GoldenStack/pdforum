@@ -5,6 +5,8 @@ use rand::{rngs::OsRng, RngCore};
 use sha2::{Digest, Sha256};
 use sqlx::{error::DatabaseError, postgres::PgPoolOptions, types::time::OffsetDateTime, PgPool};
 
+use crate::routes::Post;
+
 /// Opens a connection to the Postgres database.
 /// This uses the Postgres connection string defined in the `DATABASE_URL`
 /// environment variable.
@@ -101,14 +103,6 @@ pub async fn publish(pg: &PgPool, author: i32, content: &str) -> Result<i32, sql
     Ok(result.id)
 }
 
-/// A post loaded from the database.
-pub struct Post {
-    pub id: i32,
-    pub author: String,
-    pub created_at: OffsetDateTime,
-    pub content: String,
-}
-
 /// Returns a page of browsing results for an arbitrary user.
 pub async fn browse(pg: &PgPool) -> Result<Vec<Post>, sqlx::Error> {
     let result = sqlx::query!(
@@ -131,6 +125,28 @@ pub async fn browse(pg: &PgPool) -> Result<Vec<Post>, sqlx::Error> {
             content: record.content,
         })
         .collect::<Vec<_>>())
+}
+
+/// Retrieves a post based on its ID, returning None if there isn't such a post.
+pub async fn retrieve_post(pg: &PgPool, post_id: i32) -> Result<Option<Post>, sqlx::Error> {
+    let result = sqlx::query!(
+        "SELECT posts.id, posts.content, posts.created_at, users.username
+        FROM posts
+        INNER JOIN users
+        ON posts.author=users.id
+        WHERE posts.id=$1
+        ",
+        post_id
+    )
+    .fetch_optional(pg)
+    .await?;
+
+    Ok(result.map(|record| Post {
+        id: record.id,
+        author: record.username,
+        created_at: record.created_at,
+        content: record.content,
+    }))
 }
 
 /// Hashes the provided password, generating a salt, hashing the password with

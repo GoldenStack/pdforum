@@ -52,6 +52,7 @@ async fn main() -> Result<()> {
         .route("/login", get(routes::creds::login_empty))
         .route("/publish/:suffix", get(routes::publish::publish))
         .route("/publish", get(routes::publish::publish_empty))
+        .route("/post/:id", get(routes::post::post))
         .fallback(get(routes::error404()))
         .layer(session_layer)
         .layer(postgres_layer);

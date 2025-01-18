@@ -1,5 +1,6 @@
 pub mod browse;
 pub mod creds;
+pub mod post;
 pub mod publish;
 
 use std::sync::{Arc, OnceLock};
@@ -13,6 +14,7 @@ use axum::{
 use ecow::EcoVec;
 use parking_lot::{lock_api::MutexGuard, Mutex};
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 use typst::diag::SourceDiagnostic;
 
 use crate::render::PDF;
@@ -57,12 +59,48 @@ const TYPE_PDF: (HeaderName, &str) = (CONTENT_TYPE, "application/pdf");
 
 pub const AUTH: &str = "auth";
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Auth {
     id: i32,
     username: String,
 }
 
+/// A post loaded from the database.
+pub struct Post {
+    pub id: i32,
+    pub author: String,
+    pub created_at: OffsetDateTime,
+    pub content: String,
+}
+
+pub fn render_timestamp(time: OffsetDateTime) -> String {
+    let duration = OffsetDateTime::now_utc() - time;
+    let secs = duration.as_seconds_f64();
+
+    const MINUTE: f64 = 1. * 60.;
+    const HOUR: f64 = MINUTE * 60.;
+    const DAY: f64 = HOUR * 24.;
+    const MONTH: f64 = DAY * 30.;
+    const YEAR: f64 = DAY * 365.;
+
+    const PAIRS: [(&str, f64); 5] = [
+        ("year", YEAR),
+        ("month", MONTH),
+        ("day", DAY),
+        ("hour", HOUR),
+        ("minute", MINUTE),
+    ];
+
+    for (name, unit) in PAIRS {
+        if secs >= unit * 0.9 {
+            let count = (secs / unit).round() as i64;
+
+            return format!("{} {name}{} ago", count, if count == 1 { "" } else { "s" });
+        }
+    }
+
+    return "just now".to_owned();
+}
 pub fn error500() -> impl IntoResponse {
     static ERROR: OnceLock<Vec<u8>> = OnceLock::new();
     let error500 = ERROR.get_or_init(|| {

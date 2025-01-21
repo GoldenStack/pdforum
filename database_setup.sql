@@ -60,8 +60,22 @@ CREATE FUNCTION increment_likes() RETURNS TRIGGER
     END $$
     LANGUAGE plpgsql;    
 
+-- Trigger function for decrementing the like count
+CREATE FUNCTION decrement_likes() RETURNS TRIGGER
+    AS $$ BEGIN
+        PERFORM modify_likes(OLD.post_id, -1);
+        RETURN NEW;
+    END $$
+    LANGUAGE plpgsql;    
+
 -- Trigger to increment likes for the post after adding a like
 CREATE TRIGGER increment_likes_on_insert
     AFTER INSERT ON likes
     FOR EACH ROW
     EXECUTE FUNCTION increment_likes();
+
+-- Trigger to decrement likes for the post after adding a like
+CREATE TRIGGER decrement_likes_on_delete
+    AFTER DELETE ON likes
+    FOR EACH ROW
+    EXECUTE FUNCTION decrement_likes();

@@ -151,10 +151,23 @@ pub async fn retrieve_post(pg: &PgPool, post_id: i32) -> Result<Option<Post>, sq
     }))
 }
 
-/// Registers a like by a user for a given post.
+/// Registers a like by a user for a given post, returning whether or not it
+/// succeeded.
 pub async fn like(pg: &PgPool, author_id: i32, post_id: i32) -> Result<bool, sqlx::Error> {
     sqlx::query!(
         "INSERT INTO likes (author_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        author_id, post_id
+    )
+    .execute(pg)
+    .await
+    .map(|result| result.rows_affected() == 1)
+}
+
+/// Unregisters a like by a user for a given post, returning whether or not it
+/// succeeded.
+pub async fn unlike(pg: &PgPool, author_id: i32, post_id: i32) -> Result<bool, sqlx::Error> {
+    sqlx::query!(
+        "DELETE FROM likes WHERE author_id = $1 AND post_id = $2",
         author_id, post_id
     )
     .execute(pg)

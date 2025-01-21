@@ -54,6 +54,7 @@ async fn main() -> Result<()> {
         .route("/publish", get(routes::publish::publish_empty))
         .route("/post/:id", get(routes::post::post))
         .route("/like/:id", get(routes::like::like))
+        .route("/unlike/:id", get(routes::like::unlike))
         .fallback(get(routes::error404()))
         .layer(session_layer)
         .layer(postgres_layer);

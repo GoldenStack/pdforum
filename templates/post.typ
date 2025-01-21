@@ -21,7 +21,11 @@
     v(0em)
     content
 
-    let like-link = info.url + "/like/" + id + "?post/" + id
+    let like-link = info.url + if info.liked {
+      "/unlike/"
+    } else {
+      "/like/"
+    } + id + "?post/" + id
     
     align(horizon, grid(
       columns: (auto, 2em, auto, 5fr),

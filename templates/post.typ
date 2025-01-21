@@ -27,7 +27,7 @@
       columns: (auto, 2em, auto, 5fr),
       rows: (20pt),
       column-gutter: 3pt,
-      link(like-link, image("svg/heart.svg")),
+      link(like-link, image(if info.liked {"svg/filled-heart.svg"} else {"svg/heart.svg"})),
       link(like-link, likes),
       image("svg/comment.svg"),
       comments,

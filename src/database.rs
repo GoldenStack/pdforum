@@ -153,14 +153,24 @@ pub async fn retrieve_post(pg: &PgPool, post_id: i32) -> Result<Option<Post>, sq
 
 /// Registers a like by a user for a given post.
 pub async fn like(pg: &PgPool, author_id: i32, post_id: i32) -> Result<bool, sqlx::Error> {
-    let result = sqlx::query!(
+    sqlx::query!(
         "INSERT INTO likes (author_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
         author_id, post_id
     )
     .execute(pg)
-    .await?;
+    .await
+    .map(|result| result.rows_affected() == 1)
+}
 
-    Ok(result.rows_affected() == 1)
+/// Returns whether or not a user has liked a given post.
+pub async fn user_has_liked(pg: &PgPool, author_id: i32, post_id: i32) -> Result<bool, sqlx::Error> {
+    sqlx::query!(
+        "SELECT EXISTS(SELECT 1 FROM likes WHERE author_id=$1 AND post_id=$2)",
+        author_id, post_id
+    )
+    .fetch_one(pg)
+    .await
+    .map(|record| record.exists.unwrap_or(false))
 }
 
 /// Hashes the provided password, generating a salt, hashing the password with

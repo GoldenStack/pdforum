@@ -1,4 +1,4 @@
-use axum::{extract::{Path, Query, RawQuery}, response::{IntoResponse, Redirect}, Extension};
+use axum::{extract::{Path, RawQuery}, response::{IntoResponse, Redirect}, Extension};
 use tower_sessions::Session;
 
 use crate::{database, routes::{Auth, AUTH}, Context};

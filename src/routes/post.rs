@@ -8,6 +8,7 @@ use super::{error404, render_into, render_timestamp, Auth, Page, Return, AUTH, C
 const POST_STR: &str = include_str!("../../templates/post.typ");
 
 const HEART_SVG: &str = include_str!("../../templates/svg/heart.svg");
+const FILLED_HEART_SVG: &str = include_str!("../../templates/svg/filled-heart.svg");
 const COMMENT_SVG: &str = include_str!("../../templates/svg/comment.svg");
 
 static POST: Page = Page::new(|| {
@@ -15,6 +16,7 @@ static POST: Page = Page::new(|| {
         "post.typ",
         [
             ("svg/heart.svg", HEART_SVG),
+            ("svg/filled-heart.svg", FILLED_HEART_SVG),
             ("svg/comment.svg", COMMENT_SVG),
             ("post.typ", POST_STR),
             ("common.typ", COMMON_STR),
@@ -35,14 +37,23 @@ pub async fn post(
 
     let auth = session.get::<Auth>(AUTH).await?;
 
-    let mut page = POST.lock();
+
+    let liked = if let Some(auth) = &auth {
+        database::user_has_liked(&ctx.db, auth.id, post_id).await?
+    } else {
+        false
+    };
 
     let data = format!(
         r#"url: {}
-auth: {}"#,
+auth: {}
+liked: {}"#,
         ctx.base_url,
-        auth.is_some()
+        auth.is_some(),
+        liked
     );
+
+    let mut page = POST.lock();
 
     page.write("info.yml", data);
 

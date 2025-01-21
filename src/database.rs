@@ -93,7 +93,7 @@ pub async fn login(
 /// message (or an SQL error if one occurred).
 pub async fn publish(pg: &PgPool, author: i32, content: &str) -> Result<i32, sqlx::Error> {
     let result = sqlx::query!(
-        "INSERT INTO posts (author, content) VALUES ($1, $2) RETURNING id",
+        "INSERT INTO posts (author_id, content) VALUES ($1, $2) RETURNING id",
         author,
         content
     )
@@ -106,10 +106,10 @@ pub async fn publish(pg: &PgPool, author: i32, content: &str) -> Result<i32, sql
 /// Returns a page of browsing results for an arbitrary user.
 pub async fn browse(pg: &PgPool) -> Result<Vec<Post>, sqlx::Error> {
     let result = sqlx::query!(
-        "SELECT posts.id, posts.content, posts.created_at, users.username
+        "SELECT posts.id, posts.content, posts.created_at, posts.likes, users.username
         FROM posts
         INNER JOIN users
-        ON posts.author=users.id
+        ON posts.author_id=users.id
         ORDER BY posts.created_at DESC
         FETCH NEXT 10 ROWS ONLY",
     )
@@ -123,6 +123,7 @@ pub async fn browse(pg: &PgPool) -> Result<Vec<Post>, sqlx::Error> {
             author: record.username,
             created_at: record.created_at,
             content: record.content,
+            likes: record.likes,
         })
         .collect::<Vec<_>>())
 }
@@ -130,10 +131,10 @@ pub async fn browse(pg: &PgPool) -> Result<Vec<Post>, sqlx::Error> {
 /// Retrieves a post based on its ID, returning None if there isn't such a post.
 pub async fn retrieve_post(pg: &PgPool, post_id: i32) -> Result<Option<Post>, sqlx::Error> {
     let result = sqlx::query!(
-        "SELECT posts.id, posts.content, posts.created_at, users.username
+        "SELECT posts.id, posts.content, posts.created_at, posts.likes, users.username
         FROM posts
         INNER JOIN users
-        ON posts.author=users.id
+        ON posts.author_id=users.id
         WHERE posts.id=$1
         ",
         post_id
@@ -146,7 +147,20 @@ pub async fn retrieve_post(pg: &PgPool, post_id: i32) -> Result<Option<Post>, sq
         author: record.username,
         created_at: record.created_at,
         content: record.content,
+        likes: record.likes,
     }))
+}
+
+/// Registers a like by a user for a given post.
+pub async fn like(pg: &PgPool, author_id: i32, post_id: i32) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query!(
+        "INSERT INTO likes (author_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        author_id, post_id
+    )
+    .execute(pg)
+    .await?;
+
+    Ok(result.rows_affected() == 1)
 }
 
 /// Hashes the provided password, generating a salt, hashing the password with

@@ -47,9 +47,10 @@ auth: {}"#,
     page.write("info.yml", data);
 
     let post_data = format!(
-        "{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
+        "{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
+        post.id,
         post.author,
-        10,
+        post.likes,
         25,
         render_timestamp(post.created_at),
         post.content

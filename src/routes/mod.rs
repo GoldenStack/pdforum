@@ -2,6 +2,7 @@ pub mod browse;
 pub mod creds;
 pub mod post;
 pub mod publish;
+pub mod like;
 
 use std::sync::{Arc, OnceLock};
 
@@ -71,6 +72,7 @@ pub struct Post {
     pub author: String,
     pub created_at: OffsetDateTime,
     pub content: String,
+    pub likes: i32,
 }
 
 pub fn render_timestamp(time: OffsetDateTime) -> String {

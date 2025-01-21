@@ -8,7 +8,7 @@
 
 #{
   let data = read("data.txt").split("\u{0}")
-  let (author, likes, comments, publish_time, content) = data
+  let (id, author, likes, comments, publish_time, content) = data
 
   let post = {
     v(1em)
@@ -21,12 +21,14 @@
     v(0em)
     content
 
+    let like-link = info.url + "/like/" + id + "?post/" + id
+    
     align(horizon, grid(
       columns: (auto, 2em, auto, 5fr),
       rows: (20pt),
       column-gutter: 3pt,
-      image("svg/heart.svg"),
-      likes,
+      link(like-link, image("svg/heart.svg")),
+      link(like-link, likes),
       image("svg/comment.svg"),
       comments,
     ))

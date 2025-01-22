@@ -3,7 +3,7 @@ use tower_sessions::Session;
 
 use crate::{database, render::PDF, Context};
 
-use super::{render_into, Auth, Page, Post, Return, AUTH, COMMENT_SVG, COMMON_STR, FILLED_HEART_SVG, HEART_SVG};
+use super::{render_into, Auth, Page, Return, AUTH, COMMENT_SVG, COMMON_STR, FILLED_HEART_SVG, HEART_SVG};
 
 const BROWSE_STR: &str = include_str!("../../templates/browse.typ");
 

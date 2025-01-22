@@ -1,7 +1,6 @@
 - Truncate posts better
 - Implement an algorithm for showing posts
 - Implement pagination for browsing
-- Implement logging out
 - Announcements? Or do I just remove it all together
 - Settings menu with a bunch of config options
 - Post info menu with buttons like reply

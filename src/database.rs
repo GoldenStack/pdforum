@@ -103,83 +103,114 @@ pub async fn publish(pg: &PgPool, author: i32, content: &str) -> Result<i32, sql
     Ok(result.id)
 }
 
-/// Returns a page of browsing results for an arbitrary user.
-pub async fn browse(pg: &PgPool) -> Result<Vec<Post>, sqlx::Error> {
-    let result = sqlx::query!(
-        "SELECT posts.id, posts.content, posts.created_at, posts.likes, users.username
-        FROM posts
-        INNER JOIN users
-        ON posts.author_id=users.id
-        ORDER BY posts.created_at DESC
-        FETCH NEXT 10 ROWS ONLY",
-    )
-    .fetch_all(pg)
-    .await?;
+/// Returns a page of browsing results for a user, or for nobody.
+pub async fn browse(pg: &PgPool, user_id: Option<i32>) -> Result<Vec<Post>, sqlx::Error> {
+    if let Some(user_id) = user_id {
+        let result = sqlx::query!(
+            "SELECT
+                posts.id, posts.content, posts.created_at, posts.likes, users.username,
+                EXISTS (
+                    SELECT 1 FROM likes WHERE author_id = $1 AND post_id = posts.id
+                )
+            FROM posts
+            INNER JOIN users
+            ON posts.author_id=users.id
+            ORDER BY posts.created_at DESC
+            FETCH NEXT 10 ROWS ONLY",
+            user_id
+        )
+        .fetch_all(pg)
+        .await?;
 
-    Ok(result
-        .into_iter()
-        .map(|record| Post {
-            id: record.id,
-            author: record.username,
-            created_at: record.created_at,
-            content: record.content,
-            likes: record.likes,
-        })
-        .collect::<Vec<_>>())
-}
+        Ok(result
+            .into_iter()
+            .map(|record| Post {
+                id: record.id,
+                author: record.username,
+                created_at: record.created_at,
+                content: record.content,
+                likes: record.likes,
+                comments: 0,
+                liked: record.exists.unwrap_or(false),
+            })
+            .collect::<Vec<_>>())
+    } else {
+        let result = sqlx::query!(
+            "SELECT posts.id, posts.content, posts.created_at, posts.likes, users.username
+            FROM posts
+            INNER JOIN users
+            ON posts.author_id=users.id
+            ORDER BY posts.created_at DESC
+            FETCH NEXT 10 ROWS ONLY",
+        )
+        .fetch_all(pg)
+        .await?;
 
-/// Browses posts as a user. This will apply any 'algorithm' that exists for
-/// them (currently none), and will also return whether or not a post is liked.
-pub async fn browse_as_user(pg: &PgPool, author_id: i32) -> Result<Vec<(Post, bool)>, sqlx::Error> {
-    let result = sqlx::query!(
-        "SELECT
-            posts.id, posts.content, posts.created_at, posts.likes, users.username,
-            EXISTS (
-                SELECT 1 FROM likes WHERE author_id = $1 AND post_id = posts.id
-            )
-        FROM posts
-        INNER JOIN users
-        ON posts.author_id=users.id
-        ORDER BY posts.created_at DESC
-        FETCH NEXT 10 ROWS ONLY",
-        author_id
-    )
-    .fetch_all(pg)
-    .await?;
-
-    Ok(result
-        .into_iter()
-        .map(|record| (Post {
-            id: record.id,
-            author: record.username,
-            created_at: record.created_at,
-            content: record.content,
-            likes: record.likes,
-        }, record.exists.unwrap_or(false)))
-        .collect::<Vec<_>>())
+        Ok(result
+            .into_iter()
+            .map(|record| Post {
+                id: record.id,
+                author: record.username,
+                created_at: record.created_at,
+                content: record.content,
+                likes: record.likes,
+                comments: 0,
+                liked: false,
+            })
+            .collect::<Vec<_>>())
+    }
 }
 
 /// Retrieves a post based on its ID, returning None if there isn't such a post.
-pub async fn retrieve_post(pg: &PgPool, post_id: i32) -> Result<Option<Post>, sqlx::Error> {
-    let result = sqlx::query!(
-        "SELECT posts.id, posts.content, posts.created_at, posts.likes, users.username
-        FROM posts
-        INNER JOIN users
-        ON posts.author_id=users.id
-        WHERE posts.id=$1
-        ",
-        post_id
-    )
-    .fetch_optional(pg)
-    .await?;
+pub async fn retrieve_post(pg: &PgPool, post_id: i32, user_id: Option<i32>) -> Result<Option<Post>, sqlx::Error> {
+    if let Some(user_id) = user_id {
+        let result = sqlx::query!(
+            "SELECT posts.id, posts.content, posts.created_at, posts.likes, users.username, 
+            EXISTS (
+                SELECT 1 FROM likes WHERE author_id = $2 AND post_id = $1
+            )
+            FROM posts
+            INNER JOIN users
+            ON posts.author_id=users.id
+            WHERE posts.id=$1
+            ",
+            post_id, user_id
+        )
+        .fetch_optional(pg)
+        .await?;
 
-    Ok(result.map(|record| Post {
-        id: record.id,
-        author: record.username,
-        created_at: record.created_at,
-        content: record.content,
-        likes: record.likes,
-    }))
+        Ok(result.map(|record| Post {
+            id: record.id,
+            author: record.username,
+            created_at: record.created_at,
+            content: record.content,
+            likes: record.likes,
+            comments: 0,
+            liked: record.exists.unwrap_or(false),
+        }))
+    } else {
+        let result = sqlx::query!(
+            "SELECT posts.id, posts.content, posts.created_at, posts.likes, users.username
+            FROM posts
+            INNER JOIN users
+            ON posts.author_id=users.id
+            WHERE posts.id=$1
+            ",
+            post_id
+        )
+        .fetch_optional(pg)
+        .await?;
+
+        Ok(result.map(|record| Post {
+            id: record.id,
+            author: record.username,
+            created_at: record.created_at,
+            content: record.content,
+            likes: record.likes,
+            comments: 0,
+            liked: false,
+        }))
+    }
 }
 
 /// Registers a like by a user for a given post, returning whether or not it

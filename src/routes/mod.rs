@@ -77,6 +77,23 @@ pub struct Post {
     pub created_at: OffsetDateTime,
     pub content: String,
     pub likes: i32,
+    pub comments: i32,
+    pub liked: bool,
+}
+
+impl Post {
+    pub fn render(&self) -> String {
+        format!(
+            "{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
+            self.id,
+            self.author,
+            self.likes,
+            0,
+            self.liked,
+            render_timestamp(self.created_at),
+            self.content
+        )
+    }
 }
 
 pub fn render_timestamp(time: OffsetDateTime) -> String {

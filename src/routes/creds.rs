@@ -201,3 +201,9 @@ field: {}"#,
 pub async fn login_empty(ctx: Extension<Context>, session: Session) -> Return {
     login(ctx, session, Path(String::new())).await
 }
+
+pub async fn logout(session: Session) -> Return {
+    session.remove::<Auth>(AUTH).await?;
+
+    Ok(Redirect::temporary("/").into_response())
+}

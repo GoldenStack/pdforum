@@ -46,11 +46,9 @@ pub async fn post(
 
     let data = format!(
         r#"url: {}
-auth: {}
-liked: {}"#,
+auth: {}"#,
         ctx.base_url,
-        auth.is_some(),
-        liked
+        auth.is_some()
     );
 
     let mut page = POST.lock();
@@ -58,11 +56,12 @@ liked: {}"#,
     page.write("info.yml", data);
 
     let post_data = format!(
-        "{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
+        "{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
         post.id,
         post.author,
         post.likes,
         25,
+        liked,
         render_timestamp(post.created_at),
         post.content
     );

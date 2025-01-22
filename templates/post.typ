@@ -8,8 +8,9 @@
 
 #{
   let data = read("data.txt").split("\u{0}")
-  let (id, author, likes, comments, publish_time, content) = data
-
+  let (id, author, likes, comments, liked, publish_time, content) = data
+  let liked = liked == "true";
+  
   let post = {
     v(1em)
     link(info.url + "/user/" + author, strong(author))
@@ -21,7 +22,7 @@
     v(0em)
     content
 
-    let like-link = info.url + if info.liked {
+    let like-link = info.url + if liked {
       "/unlike/"
     } else {
       "/like/"
@@ -31,7 +32,7 @@
       columns: (auto, 2em, auto, 5fr),
       rows: (20pt),
       column-gutter: 3pt,
-      link(like-link, image(if info.liked {"svg/filled-heart.svg"} else {"svg/heart.svg"})),
+      link(like-link, image(if liked {"svg/filled-heart.svg"} else {"svg/heart.svg"})),
       link(like-link, likes),
       image("svg/comment.svg"),
       comments,

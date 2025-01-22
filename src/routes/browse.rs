@@ -34,8 +34,6 @@ pub async fn browse(ctx: Extension<Context>, session: Session) -> Return {
             acc
         });
 
-    println!("{}", data.replace("\u{0}", "[NULL]"));
-
     let auth = session.get::<Auth>(AUTH).await.ok().flatten().is_some();
 
     let mut page = BROWSE.lock();

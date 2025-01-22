@@ -128,6 +128,37 @@ pub async fn browse(pg: &PgPool) -> Result<Vec<Post>, sqlx::Error> {
         .collect::<Vec<_>>())
 }
 
+/// Browses posts as a user. This will apply any 'algorithm' that exists for
+/// them (currently none), and will also return whether or not a post is liked.
+pub async fn browse_as_user(pg: &PgPool, author_id: i32) -> Result<Vec<(Post, bool)>, sqlx::Error> {
+    let result = sqlx::query!(
+        "SELECT
+            posts.id, posts.content, posts.created_at, posts.likes, users.username,
+            EXISTS (
+                SELECT 1 FROM likes WHERE author_id = $1 AND post_id = posts.id
+            )
+        FROM posts
+        INNER JOIN users
+        ON posts.author_id=users.id
+        ORDER BY posts.created_at DESC
+        FETCH NEXT 10 ROWS ONLY",
+        author_id
+    )
+    .fetch_all(pg)
+    .await?;
+
+    Ok(result
+        .into_iter()
+        .map(|record| (Post {
+            id: record.id,
+            author: record.username,
+            created_at: record.created_at,
+            content: record.content,
+            likes: record.likes,
+        }, record.exists.unwrap_or(false)))
+        .collect::<Vec<_>>())
+}
+
 /// Retrieves a post based on its ID, returning None if there isn't such a post.
 pub async fn retrieve_post(pg: &PgPool, post_id: i32) -> Result<Option<Post>, sqlx::Error> {
     let result = sqlx::query!(

@@ -56,6 +56,10 @@ pub(crate) const ERROR_STR: &str = include_str!("../../templates/error.typ");
 pub(crate) const COMMON_STR: &str = include_str!("../../templates/common.typ");
 pub(crate) const KEYBOARD_STR: &str = include_str!("../../templates/keyboard.typ");
 
+pub(crate) const HEART_SVG: &str = include_str!("../../templates/svg/heart.svg");
+pub(crate) const FILLED_HEART_SVG: &str = include_str!("../../templates/svg/filled-heart.svg");
+pub(crate) const COMMENT_SVG: &str = include_str!("../../templates/svg/comment.svg");
+
 const TYPE_PDF: (HeaderName, &str) = (CONTENT_TYPE, "application/pdf");
 
 pub const AUTH: &str = "auth";

@@ -3,13 +3,9 @@ use tower_sessions::Session;
 
 use crate::{database, render::PDF, Context};
 
-use super::{error404, render_into, render_timestamp, Auth, Page, Return, AUTH, COMMON_STR};
+use super::{error404, render_into, render_timestamp, Auth, Page, Return, AUTH, COMMENT_SVG, COMMON_STR, FILLED_HEART_SVG, HEART_SVG};
 
 const POST_STR: &str = include_str!("../../templates/post.typ");
-
-const HEART_SVG: &str = include_str!("../../templates/svg/heart.svg");
-const FILLED_HEART_SVG: &str = include_str!("../../templates/svg/filled-heart.svg");
-const COMMENT_SVG: &str = include_str!("../../templates/svg/comment.svg");
 
 static POST: Page = Page::new(|| {
     PDF::make(
